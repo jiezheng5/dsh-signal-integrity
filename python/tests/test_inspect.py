@@ -31,7 +31,10 @@ def test_inspect_clean_line(line_path: Path):
     assert q["passivity"]["passive"] is True
     assert q["reciprocity"]["reciprocal"] is True
     assert q["causality"]["score_percent"] == pytest.approx(100.0)
+    assert q["causality"]["verdict"] == "good"
     assert "P370" in q["causality"]["method"]
+    assert q["passivity"]["p370"]["evaluation"] == "good"
+    assert q["reciprocity"]["p370"]["evaluation"] == "good"
     ids = [question["id"] for question in result["questions"]]
     assert ids == ["device", "terminal_mode"]
     assert {o["label"] for o in result["questions"][0]["options"]} == {
@@ -50,6 +53,7 @@ def test_active_network_fails_passivity(tmp_path: Path):
     assert p["passive"] is False
     assert p["violation_count"] == 401
     assert p["sigma_max_worst"] > 1.4
+    assert p["p370"]["evaluation"] == "poor"
     assert any("passivity violated" in w for w in result["warnings"])
 
 
@@ -58,6 +62,7 @@ def test_nonreciprocal_network_flagged(tmp_path: Path):
     r = run({"path": str(path)})["quality"]["reciprocity"]
     assert r["reciprocal"] is False
     assert r["max_abs_diff_worst"] > 0.5
+    assert r["p370"]["evaluation"] == "poor"
 
 
 def test_advanced_network_scores_low_on_causality(tmp_path: Path):
@@ -65,6 +70,7 @@ def test_advanced_network_scores_low_on_causality(tmp_path: Path):
     c = run({"path": str(path)})["quality"]["causality"]
     assert c["applicable"] is True
     assert c["score_percent"] == pytest.approx(0.0, abs=1.0)
+    assert c["verdict"] == "poor"
 
 
 def test_oneport_skips_reciprocity_and_causality(tmp_path: Path):
@@ -73,7 +79,9 @@ def test_oneport_skips_reciprocity_and_causality(tmp_path: Path):
     assert result["metadata"]["n_ports"] == 1
     assert result["quality"]["reciprocity"]["applicable"] is False
     assert result["quality"]["causality"]["applicable"] is False
-    assert result["quality"]["causality"]["verdict"] == "inconclusive"
+    assert result["quality"]["causality"]["verdict"] == "not_applicable"
+    assert result["quality"]["passivity"]["passive"] is True
+    assert result["quality"]["passivity"]["p370"]["evaluation"] == "not_applicable"
     assert [q["id"] for q in result["questions"]] == ["device", "terminal_mode"]
     assert result["questions"][1]["options"][0]["label"] == "one_port"
 
@@ -149,17 +157,16 @@ def test_passivity_tolerance_is_honored(tmp_path: Path):
     assert loose["tolerance"] == 1e-2
 
 
-@pytest.mark.xfail(
-    strict=True, reason="TODO(brittany): define causality_verdict thresholds in dsh_si/quality.py"
-)
-def test_causality_verdict_thresholds_defined():
-    assert quality.causality_verdict(100.0, 401)[0] == "pass"
-    assert quality.causality_verdict(0.0, 401)[0] == "fail"
-    assert quality.causality_verdict(None, 401)[0] == "inconclusive"
+def test_p370_bands_follow_scikit_rf():
+    assert quality._evaluate_passivity(100.0) == "good"
+    assert quality._evaluate_passivity(99.5) == "acceptable"
+    assert quality._evaluate_passivity(90.0) == "inconclusive"
+    assert quality._evaluate_passivity(10.0) == "poor"
+    assert quality._evaluate_passivity(None) == "inconclusive"
 
 
 def test_sigma_max_matches_direct_norm():
     ntwk = fixtures.lossy_line(freq=fixtures.frequency(npoints=11))
-    p = quality.passivity(ntwk, 1e-9)
+    p = quality.passivity_detail(ntwk, 1e-9)
     direct = max(np.linalg.norm(ntwk.s[i], 2) for i in range(11))
     assert p["sigma_max_worst"] == pytest.approx(direct)

@@ -51,9 +51,10 @@ switch (mode) {
           mixed_mode_hint: false, size_bytes: 1234,
         },
         quality: {
-          passivity: { passive: true, tolerance: request.payload.tolerances?.passivity ?? -1, sigma_max_worst: 0.9991, worst_freq_hz: 1e7, violation_count: 0, violation_freqs_hz: [], method: 'svd' },
-          reciprocity: { applicable: true, reciprocal: false, tolerance: 1e-6, max_abs_diff_worst: 0.0123, worst_freq_hz: 5e9, violation_count: 7, violation_freqs_hz: [], method: 'diff' },
-          causality: { applicable: true, score_percent: 100, verdict: 'inconclusive', note: 'thresholds pending', method: 'P370 CQMi' },
+          passivity: { passive: true, tolerance: request.payload.tolerances?.passivity ?? -1, sigma_max_worst: 0.9991, worst_freq_hz: 1e7, violation_count: 0, violation_freqs_hz: [], method: 'svd', p370: { score_percent: 100, evaluation: 'good' } },
+          reciprocity: { applicable: true, reciprocal: false, tolerance: 1e-6, max_abs_diff_worst: 0.0123, worst_freq_hz: 5e9, violation_count: 7, violation_freqs_hz: [], method: 'diff', p370: { score_percent: 91.2, evaluation: 'acceptable' } },
+          causality: { applicable: true, score_percent: 100, verdict: 'good', note: 'screening only', method: 'P370', p370: { score_percent: 100, evaluation: 'good' } },
+          p370_method: 'IEEE P370 via scikit-rf',
         },
         warnings: ['header comments mention mixed-mode terms'],
         questions: [{ id: 'device', question: 'What device?', options: [{ label: 'inductor' }] }],

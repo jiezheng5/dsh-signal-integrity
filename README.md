@@ -85,13 +85,15 @@ The TypeScript tests mount the plugin on a real DSH tool registry and the real l
 
 ## Quality checks
 
-| Check | Method | Reported |
-|---|---|---|
-| Passivity | largest singular value of S at every frequency, compared with 1 + `tolerances.passivity` | worst value and frequency, violating point count |
-| Reciprocity | max |Sij − Sji| per frequency against `tolerances.reciprocity`; not applicable to one-ports | worst value and frequency, violating point count |
-| Causality | IEEE P370 initial causality quality metric (CQMi) from scikit-rf's `IEEEP370_FD_QM`; a screening score, not a proof | score in percent, method name, verdict |
+Two layers are reported together. The IEEE P370 metrics come from scikit-rf's `IEEEP370_FD_QM`, the only open-source Python implementation of the standard's frequency-domain quality checks, and carry the standard's evaluation bands (good, acceptable, inconclusive, poor). The exact per-frequency checks are computed by this plugin and say *where* a problem is.
 
-The causality verdict thresholds are deliberately unset (`causality_verdict` in `python/dsh_si/quality.py` returns "inconclusive" and says so). A strict-xfail test flips green once thresholds are defined.
+| Check | IEEE P370 metric (verdict) | Exact detail (location) |
+|---|---|---|
+| Passivity | PQMi score and band | largest singular value of S per frequency vs `1 + tolerances.passivity`; worst point, violating count |
+| Reciprocity | RQMi score and band | max \|Sij − Sji\| per frequency vs `tolerances.reciprocity`; worst point, violating count |
+| Causality | CQMi score and band (screening, not a proof) | none: causality has no exact per-frequency form on sampled data |
+
+One-ports get the exact passivity check only; the P370 metrics need off-diagonal terms. References: [scikit-rf IEEE P370 example](https://scikit-rf.readthedocs.io/en/latest/examples/networktheory/IEEEP370%20Deembedding.html), [MATLAB `ieee370QualityCheckFrequencyDomain`](https://www.mathworks.com/help/rf/ref/ieee370qualitycheckfrequencydomain.html) for the reference implementation's behavior.
 
 ## Assumptions and limits
 

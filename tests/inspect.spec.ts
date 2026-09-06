@@ -27,9 +27,10 @@ describe('si_inspect with the fake worker', () => {
     expect(text).toContain('Inspected fake.s2p (sha256 aaaaaaaaaaaa…)')
     expect(text).toContain('Ports: 2 · Points: 401 · 10 MHz to 20 GHz · Format: S RI (Touchstone 1.0)')
     expect(text).toContain('Reference impedance: 50 Ω (all ports)')
-    expect(text).toContain('Passivity: pass (max σ 0.9991 at 10 MHz, 0 violating points, tol 0.001)')
-    expect(text).toContain('Reciprocity: FAIL (max |Sij-Sji| 1.23e-2 at 5 GHz, 7 violating points)')
-    expect(text).toContain('Causality screening: inconclusive (CQMi 100.0%) — thresholds pending')
+    expect(text).toContain('Passivity: pass (max σ 0.9991 at 10 MHz, 0 violating points, tol 0.001) · P370 good (100.0%)')
+    expect(text).toContain('Reciprocity: FAIL (max |Sij-Sji| 1.23e-2 at 5 GHz, 7 violating points) · P370 acceptable (91.2%)')
+    expect(text).toContain('Causality: P370 good (CQMi 100.0%) — screening only')
+    expect(text).toContain('P370 method: IEEE P370 via scikit-rf')
     expect(text).toContain('Warning: header comments mention mixed-mode terms')
     expect(text).toContain('ask_user_question')
     expect(text).toContain('[{"id":"device","question":"What device?","options":[{"label":"inductor"}]}]')
@@ -83,7 +84,7 @@ describe.skipIf(!uvAvailable())('si_inspect through uv on the shipped examples',
     expect(text).toContain('Ports: 2 · Points: 401 · 10 MHz to 20 GHz')
     expect(text).toContain('Passivity: pass')
     expect(text).toContain('Reciprocity: pass')
-    expect(text).toContain('CQMi 100.0%')
+    expect(text).toContain('Causality: P370 good (CQMi 100.0%)')
     expect(text).toContain('"id":"terminal_mode"')
   })
 
@@ -92,7 +93,7 @@ describe.skipIf(!uvAvailable())('si_inspect through uv on the shipped examples',
     const text = textOf(await callTool(ctx, 'si_inspect', { path: EXAMPLE_RL }))
     expect(text).toContain('Ports: 1')
     expect(text).toContain('Reciprocity: not applicable (one-port)')
-    expect(text).toContain('Causality screening: inconclusive')
+    expect(text).toContain('Causality: P370 not_applicable')
   })
 
   it('reports a missing file', async () => {

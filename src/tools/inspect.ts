@@ -32,6 +32,14 @@ function num(value: JsonValue | undefined): number | undefined {
   return typeof value === 'number' ? value : undefined
 }
 
+/** " · P370 good (99.9%)" or " · P370 not_applicable". */
+function p370(entry: JsonObject): string {
+  const evaluation = entry['evaluation']
+  if (typeof evaluation !== 'string') return ''
+  const score = num(entry['score_percent'])
+  return ` · P370 ${evaluation}${score !== undefined ? ` (${score.toFixed(1)}%)` : ''}`
+}
+
 export function renderInspect(value: InspectValue): string {
   const md = value.metadata
   const lines: string[] = []
@@ -56,24 +64,26 @@ export function renderInspect(value: InspectValue): string {
   lines.push(
     `Passivity: ${passivity['passive'] === true ? 'pass' : 'FAIL'}`
     + ` (max σ ${Number(passivity['sigma_max_worst'] ?? Number.NaN).toFixed(4)} at ${formatHz(num(passivity['worst_freq_hz']) ?? 0)},`
-    + ` ${String(passivity['violation_count'] ?? 0)} violating points, tol ${String(passivity['tolerance'])})`,
+    + ` ${String(passivity['violation_count'] ?? 0)} violating points, tol ${String(passivity['tolerance'])})`
+    + p370(obj(passivity['p370'])),
   )
   if (reciprocity['applicable'] === true) {
     lines.push(
       `Reciprocity: ${reciprocity['reciprocal'] === true ? 'pass' : 'FAIL'}`
       + ` (max |Sij-Sji| ${Number(reciprocity['max_abs_diff_worst'] ?? Number.NaN).toExponential(2)} at ${formatHz(num(reciprocity['worst_freq_hz']) ?? 0)},`
-      + ` ${String(reciprocity['violation_count'] ?? 0)} violating points)`,
+      + ` ${String(reciprocity['violation_count'] ?? 0)} violating points)`
+      + p370(obj(reciprocity['p370'])),
     )
   } else {
     lines.push('Reciprocity: not applicable (one-port)')
   }
   const score = num(causality['score_percent'])
   lines.push(
-    `Causality screening: ${String(causality['verdict'])}`
+    `Causality: P370 ${String(causality['verdict'])}`
     + (score !== undefined ? ` (CQMi ${score.toFixed(1)}%)` : '')
     + ` — ${String(causality['note'] ?? '')}`,
   )
-  lines.push(`Method: ${String(causality['method'] ?? '')}`)
+  lines.push(`P370 method: ${String(value.quality['p370_method'] ?? causality['method'] ?? '')}`)
   for (const warning of value.warnings) lines.push(`Warning: ${warning}`)
   lines.push('')
   lines.push('Before calling si_analyze, ask the user these questions with ask_user_question (pass the array as-is):')
