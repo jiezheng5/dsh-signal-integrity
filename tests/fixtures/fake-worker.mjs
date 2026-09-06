@@ -37,6 +37,34 @@ switch (mode) {
       },
     })
     break
+  case 'inspect':
+    reply({
+      protocol: 1,
+      ok: true,
+      result: {
+        path: request.payload.path,
+        hash: 'a'.repeat(64),
+        metadata: {
+          file_name: 'fake.s2p', n_ports: 2, n_freq: 401, f_min_hz: 1e7, f_max_hz: 2e10,
+          frequency_unit: 'ghz', parameter: 's', format: 'ri', touchstone_version: '1.0',
+          reference_impedance: [{ re: 50, im: 0 }, { re: 50, im: 0 }], port_names: null, comments: '',
+          mixed_mode_hint: false, size_bytes: 1234,
+        },
+        quality: {
+          passivity: { passive: true, tolerance: request.payload.tolerances?.passivity ?? -1, sigma_max_worst: 0.9991, worst_freq_hz: 1e7, violation_count: 0, violation_freqs_hz: [], method: 'svd' },
+          reciprocity: { applicable: true, reciprocal: false, tolerance: 1e-6, max_abs_diff_worst: 0.0123, worst_freq_hz: 5e9, violation_count: 7, violation_freqs_hz: [], method: 'diff' },
+          causality: { applicable: true, score_percent: 100, verdict: 'inconclusive', note: 'thresholds pending', method: 'P370 CQMi' },
+        },
+        warnings: ['header comments mention mixed-mode terms'],
+        questions: [{ id: 'device', question: 'What device?', options: [{ label: 'inductor' }] }],
+        required_by_device: { inductor: ['terminal_mode'] },
+      },
+    })
+    break
+  case 'domain-error':
+    reply({ protocol: 1, ok: false, error: { code: 'parse_error', message: 'fake.s2p: cannot parse Touchstone header/data', detail: 'ValueError: boom' } })
+    exit(1)
+    break
   case 'error':
     reply({ protocol: 1, ok: false, error: { code: 'parse_error', message: 'bad touchstone', detail: 'line 3' } })
     exit(1)

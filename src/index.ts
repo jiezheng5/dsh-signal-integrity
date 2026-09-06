@@ -12,6 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import '@deepseek-ai/dsh-tools'
 import '@deepseek-ai/dsh-subprocess'
 import { Config } from './config.ts'
+import { registerInspectTool } from './tools/inspect.ts'
 import { registerReadyTool } from './tools/ready.ts'
 import { WorkerClient } from './worker.ts'
 
@@ -24,4 +25,5 @@ export { PROTOCOL_VERSION, COMMANDS, WORKER_ERROR_CODES } from './protocol.ts'
 export function apply(ctx: Context, config: Config): void {
   const worker = new WorkerClient(ctx, config)
   registerReadyTool(ctx, worker, config)
+  registerInspectTool(ctx, worker, config)
 }
