@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import quality
+from . import plots, quality, report
 from .touchstone import load, resolve_path, sha256_file
 
 DEVICE_OPTIONS = [
@@ -135,6 +135,22 @@ def run(payload: dict[str, Any]) -> dict[str, Any]:
             f"reciprocity violated at {checks['reciprocity']['violation_count']} points "
             f"(max |Sij-Sji| = {checks['reciprocity']['max_abs_diff_worst']:.4g})"
         )
+    plot_entries: list[dict[str, str]] = []
+    report_dir: str | None = None
+    output_dir = payload.get("output_dir")
+    if isinstance(output_dir, str) and output_dir:
+        directory = report.create_report_dir(output_dir, path.stem, file_hash, kind="inspect")
+        subtitle = (
+            f"{metadata['n_ports']}-port · {metadata['n_freq']} points · "
+            f"Z0 {metadata['reference_impedance'][0]['re']:g} Ω · sha256 {file_hash[:8]}"
+        )
+        png = plots.save_png(
+            plots.s_magnitude_overview(network, path.name, subtitle), directory / "s_magnitude.png"
+        )
+        plot_entries.append(
+            {"name": "s_magnitude", "path": str(png), "title": f"|S| overview of {path.name}"}
+        )
+        report_dir = str(directory)
     return {
         "path": str(path),
         "hash": file_hash,
@@ -143,4 +159,6 @@ def run(payload: dict[str, Any]) -> dict[str, Any]:
         "warnings": warnings,
         "questions": build_questions(metadata),
         "required_by_device": REQUIRED_BY_DEVICE,
+        "report_dir": report_dir,
+        "plots": plot_entries,
     }
