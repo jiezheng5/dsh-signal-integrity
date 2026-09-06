@@ -1,0 +1,6 @@
+# Bundle layer for dsh-signal-integrity. Applied after dsh-base when a profile
+# lists this package in dsh.profile.bundles. Users override the row's config
+# in their profile's cordis.patch.yml (a patch replaces the whole `config`).
+- insert:
+    - id: signal-integrity
+      name: dsh-signal-integrity

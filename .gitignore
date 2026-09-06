@@ -1,0 +1,15 @@
+node_modules/
+lib/
+*.tsbuildinfo
+pnpm-debug.log
+coverage/
+.venv/
+python/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.remember/
+.claude/
+.DS_Store
+*.tgz

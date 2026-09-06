@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['22.19.0', '24']
+        python: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Enable pnpm via corepack
+        run: corepack enable && corepack prepare pnpm@11.7.0 --activate
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.9.4'
+          python-version: ${{ matrix.python }}
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync Python worker environment
+        run: uv sync --project python --frozen --group dev
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint Python
+        run: pnpm lint:py
+
+      - name: Python tests
+        run: pnpm test:py
+
+      - name: TypeScript tests (fake worker + real uv worker)
+        run: pnpm test
+
+      - name: Pack tarball
+        run: pnpm pack
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.node == '22.19.0' && matrix.python == '3.12'
+        with:
+          name: dsh-signal-integrity-tarball
+          path: '*.tgz'

@@ -1,0 +1,8 @@
+# Build-script allowances for dev dependencies (pnpm >= 10 blocks lifecycle
+# scripts by default). The local subprocess provider backs the tests as the
+# real spawn seam; node-pty and koffi are its native helpers.
+allowBuilds:
+  esbuild: true
+  node-pty: true
+  koffi: true
+  '@deepseek-ai/dsh-subprocess-local': true
