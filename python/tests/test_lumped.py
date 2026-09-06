@@ -58,18 +58,18 @@ def test_capacitor_reports_nan_when_inductive():
 @PENDING
 def test_self_resonance_of_series_rlc():
     f = fixtures.frequency(0.1, 10.0, 991)
-    l, c = 10e-9, 1e-12  # f_srf = 1/(2*pi*sqrt(LC)) ~ 1.5915 GHz
-    z = 0.5 + 1j * (f.w * l - 1 / (f.w * c))
+    ind, cap = 10e-9, 1e-12  # f_srf = 1/(2*pi*sqrt(LC)) ~ 1.5915 GHz
+    z = 0.5 + 1j * (f.w * ind - 1 / (f.w * cap))
     assert lumped.self_resonance_hz(z, f.f) == pytest.approx(
-        1 / (2 * np.pi * np.sqrt(l * c)), rel=2e-3
+        1 / (2 * np.pi * np.sqrt(ind * cap)), rel=2e-3
     )
 
 
 @PENDING
 def test_classify_region_marks_beyond_srf():
     f = fixtures.frequency(0.1, 10.0, 100)
-    l, c = 10e-9, 1e-12
-    z = 0.5 + 1j * (f.w * l - 1 / (f.w * c))
+    ind, cap = 10e-9, 1e-12
+    z = 0.5 + 1j * (f.w * ind - 1 / (f.w * cap))
     labels = lumped.classify_region(z, f.f, "inductor")
     assert len(labels) == 100
     assert labels[0] != "valid"  # below SRF the reactance is capacitive for this series RLC
