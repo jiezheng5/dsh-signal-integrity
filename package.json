@@ -1,0 +1,68 @@
+{
+  "name": "dsh-signal-integrity",
+  "version": "0.1.0",
+  "description": "Unofficial DeepSeek Harness plugin: agent-guided Touchstone S-parameter analysis and signal-integrity reports",
+  "keywords": ["dsh-plugin", "deepseek-harness", "signal-integrity", "touchstone", "s-parameters", "scikit-rf", "ai-agent"],
+  "license": "MIT",
+  "author": "Jie Zheng",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiezheng5/dsh-signal-integrity.git"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "python/pyproject.toml",
+    "python/uv.lock",
+    "python/README.md",
+    "python/dsh_si/**/*.py"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "rm -rf lib && tsc -p tsconfig.build.json && tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:py": "uv run --project python --frozen --group dev pytest",
+    "lint:py": "uv run --project python --frozen --group dev ruff check .",
+    "check": "pnpm typecheck && pnpm test && pnpm lint:py && pnpm test:py"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5",
+    "@deepseek-ai/dsh-subprocess": ">=0.1.2-rc.1 <0.2.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.2-rc.1 <0.2.0",
+    "@deepseek-ai/schemastery": ">=3.18.2 <4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-subprocess": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-subprocess-local": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
+    "@deepseek-ai/schemastery": "3.18.2",
+    "@types/node": "^22.20.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}
