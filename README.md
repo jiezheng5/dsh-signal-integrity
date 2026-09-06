@@ -6,7 +6,7 @@ Turns Touchstone S-parameter files into agent-guided signal-integrity reports: t
 
 ## Status
 
-Milestone 1 of 5 (plugin scaffold). The `si_ready` tool loads into DSH and probes the Python worker. Inspection, lumped-element extraction, and interconnect analysis follow in later pull requests; see [the plan](docs/plans/dsh-signal-integrity-plan.md).
+Milestone 2 of 5 (Touchstone inspection). `si_ready` probes the Python worker and `si_inspect` parses, hashes, and quality-screens a Touchstone file, then hands the agent the questions it must ask before analysis. Lumped-element extraction and interconnect analysis follow in later pull requests; see [the plan](docs/plans/dsh-signal-integrity-plan.md).
 
 ## How it works
 
@@ -24,7 +24,7 @@ Tools (model-facing):
 | Tool | Purpose |
 |---|---|
 | `si_ready` | Probe uv, the Python interpreter, and the scientific packages; explain any missing piece with the exact remedy. |
-| `si_inspect` | *(milestone 2)* Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and list the interpretation questions the agent must ask. |
+| `si_inspect` | Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and return the interpretation questions (shaped for `ask_user_question`) the agent must ask. |
 | `si_analyze` | *(milestones 3–4)* Run the device-specific extraction once the interpretation is complete, and write the report. |
 
 ## Install
@@ -41,7 +41,18 @@ npx @deepseek-ai/dsh --profile web --dump-config   # shows the signal-integrity 
 npx @deepseek-ai/dsh web
 ```
 
-Then ask the agent to call `si_ready`. The first call runs `uv sync` for the worker, which takes a minute.
+Then ask the agent to call `si_ready`. The first call runs `uv sync` for the worker, which takes a minute. Next, point it at a file: "Inspect `<repo>/examples/synthetic/lossy_line_20mm.s2p`". The [synthetic examples](examples/synthetic/README.md) list the expected result for each file.
+
+### Model credentials
+
+DSH reads provider keys from the launch environment or from `$DSH_HOME/.env` (default `~/.dsh/.env`). Keep keys out of shell history and chat:
+
+```sh
+umask 077
+printf 'DEEPSEEK_API_KEY=%s\n' "$YOUR_KEY_VARIABLE" > ~/.dsh/.env
+```
+
+The URL `dsh web` prints carries a per-launch browser-trust token. Treat it like a password: do not paste it into issues, chats, or documentation. It is bound to 127.0.0.1 and rotates on every restart.
 
 Release tarball and GitHub installs are documented with the `v0.1.0` release.
 
@@ -69,6 +80,16 @@ pnpm check          # typecheck, vitest, ruff, pytest
 ```
 
 The TypeScript tests mount the plugin on a real DSH tool registry and the real local subprocess provider, with no model or API key. Most use a fake worker (`tests/fixtures/fake-worker.mjs`) to exercise framing, error classification, and cancellation; two tests run the real worker through uv and skip when uv is absent.
+
+## Quality checks
+
+| Check | Method | Reported |
+|---|---|---|
+| Passivity | largest singular value of S at every frequency, compared with 1 + `tolerances.passivity` | worst value and frequency, violating point count |
+| Reciprocity | max |Sij − Sji| per frequency against `tolerances.reciprocity`; not applicable to one-ports | worst value and frequency, violating point count |
+| Causality | IEEE P370 initial causality quality metric (CQMi) from scikit-rf's `IEEEP370_FD_QM`; a screening score, not a proof | score in percent, method name, verdict |
+
+The causality verdict thresholds are deliberately unset (`causality_verdict` in `python/dsh_si/quality.py` returns "inconclusive" and says so). A strict-xfail test flips green once thresholds are defined.
 
 ## Assumptions and limits
 
