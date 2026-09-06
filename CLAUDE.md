@@ -50,4 +50,5 @@ TS tests mount the plugin on a bare `Context` with `SystemPrompt`, `ToolRuntime`
 - Small commits with conventional-commit subjects; push the feature branch and open a PR per milestone with problem, behavior, assumptions, tests run.
 - Never paste the `dsh web` token URL, API keys, or `.env` contents into chat, docs, or commits. Credentials go in `~/.dsh/.env` (mode 600).
 - Use `superpowers:brainstorming` before new features, `superpowers:test-driven-development` while implementing, `superpowers:verification-before-completion` before claiming green.
-- End of session: run `/remember` (Remember plugin, writes `.remember/`, gitignored) and update `docs/handoff.md` (committed) with state, next step, and open questions.
+- End of session: run `/remember` (Remember plugin, writes `.remember/`, gitignored) and overwrite `docs/handoff.md` (committed) with state, next step, and open questions.
+- Maintenance of this file: replace, never append. Keep only what a fresh session cannot derive from the repo; delete lessons once the code makes them obvious. CI fails above 80 lines here and 60 in `docs/handoff.md`. Audit at milestone boundaries with `claude-md-management:claude-md-improver`.
