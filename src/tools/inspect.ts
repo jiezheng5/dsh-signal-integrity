@@ -32,12 +32,16 @@ function num(value: JsonValue | undefined): number | undefined {
   return typeof value === 'number' ? value : undefined
 }
 
-/** " · P370 good (99.9%)" or " · P370 not_applicable". */
+/** " · P370 good (99.9%)" or " · P370 not applicable". */
 function p370(entry: JsonObject): string {
   const evaluation = entry['evaluation']
   if (typeof evaluation !== 'string') return ''
   const score = num(entry['score_percent'])
-  return ` · P370 ${evaluation}${score !== undefined ? ` (${score.toFixed(1)}%)` : ''}`
+  return ` · P370 ${evaluation.replace('_', ' ')}${score !== undefined ? ` (${score.toFixed(1)}%)` : ''}`
+}
+
+function verdict(flag: JsonValue | undefined): string {
+  return flag === true ? 'PASS' : flag === false ? 'FAIL' : 'unknown'
 }
 
 export function renderInspect(value: InspectValue): string {
@@ -61,29 +65,33 @@ export function renderInspect(value: InspectValue): string {
   const passivity = obj(value.quality['passivity'])
   const reciprocity = obj(value.quality['reciprocity'])
   const causality = obj(value.quality['causality'])
+  const nPoints = String(md['n_freq'] ?? '?')
+  lines.push('')
+  lines.push('Quality checks (IEEE P370 band · exact per-frequency detail):')
   lines.push(
-    `Passivity: ${passivity['passive'] === true ? 'pass' : 'FAIL'}`
-    + ` (max σ ${Number(passivity['sigma_max_worst'] ?? Number.NaN).toFixed(4)} at ${formatHz(num(passivity['worst_freq_hz']) ?? 0)},`
-    + ` ${String(passivity['violation_count'] ?? 0)} violating points, tol ${String(passivity['tolerance'])})`
-    + p370(obj(passivity['p370'])),
+    `  Passivity:   ${verdict(passivity['passive'])}`
+    + p370(obj(passivity['p370']))
+    + ` · max singular value ${Number(passivity['sigma_max_worst'] ?? Number.NaN).toFixed(4)} at ${formatHz(num(passivity['worst_freq_hz']) ?? 0)}`
+    + ` · ${String(passivity['violation_count'] ?? 0)}/${nPoints} points over tolerance ${String(passivity['tolerance'])}`,
   )
   if (reciprocity['applicable'] === true) {
     lines.push(
-      `Reciprocity: ${reciprocity['reciprocal'] === true ? 'pass' : 'FAIL'}`
-      + ` (max |Sij-Sji| ${Number(reciprocity['max_abs_diff_worst'] ?? Number.NaN).toExponential(2)} at ${formatHz(num(reciprocity['worst_freq_hz']) ?? 0)},`
-      + ` ${String(reciprocity['violation_count'] ?? 0)} violating points)`
-      + p370(obj(reciprocity['p370'])),
+      `  Reciprocity: ${verdict(reciprocity['reciprocal'])}`
+      + p370(obj(reciprocity['p370']))
+      + ` · max |Sij-Sji| ${Number(reciprocity['max_abs_diff_worst'] ?? Number.NaN).toExponential(2)} at ${formatHz(num(reciprocity['worst_freq_hz']) ?? 0)}`
+      + ` · ${String(reciprocity['violation_count'] ?? 0)}/${nPoints} points over tolerance ${String(reciprocity['tolerance'])}`,
     )
   } else {
-    lines.push('Reciprocity: not applicable (one-port)')
+    lines.push('  Reciprocity: not applicable (one-port)')
   }
   const score = num(causality['score_percent'])
   lines.push(
-    `Causality: P370 ${String(causality['verdict'])}`
+    `  Causality:   ${causality['applicable'] === true ? `P370 ${String(causality['verdict'])}` : 'not applicable (one-port)'}`
     + (score !== undefined ? ` (CQMi ${score.toFixed(1)}%)` : '')
-    + ` — ${String(causality['note'] ?? '')}`,
+    + (causality['applicable'] === true ? ` · ${String(causality['note'] ?? '')}` : ''),
   )
-  lines.push(`P370 method: ${String(value.quality['p370_method'] ?? causality['method'] ?? '')}`)
+  lines.push(`  Method: ${String(value.quality['p370_method'] ?? causality['method'] ?? '')}`)
+  lines.push('')
   for (const warning of value.warnings) lines.push(`Warning: ${warning}`)
   lines.push('')
   lines.push('Before calling si_analyze, ask the user these questions with ask_user_question (pass the array as-is):')
