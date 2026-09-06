@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-signal-integrity · Learning Log</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a1a; --muted: #5f6368; --line: #e3e3e3; --card: #ffffff;
+    --accent: #2f6fed; --accent-soft: #e8f0fe; --ok: #1e8e3e; --warn: #b26a00; --bad: #c5221f;
+    --code: #f3f4f6; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111214; --fg: #e8eaed; --muted: #9aa0a6; --line: #2b2d31; --card: #191b1f;
+      --accent: #8ab4f8; --accent-soft: #1f2a3d; --code: #1f2125; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1100px; margin: 0 auto; padding: 10px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+  .brand { font-weight: 650; margin-right: auto; }
+  .brand small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+  nav a { color: var(--muted); text-decoration: none; padding: 6px 9px; border-radius: 6px; font-size: 14px; }
+  nav a.active, nav a:hover { color: var(--accent); background: var(--accent-soft); }
+  main { max-width: 1100px; margin: 0 auto; padding: 22px 18px 60px; }
+  section.page { display: none; }
+  section.page.active { display: block; }
+  h1 { font-size: 26px; margin: 4px 0 4px; }
+  h2 { font-size: 19px; margin: 30px 0 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 20px 0 6px; }
+  p.lead { color: var(--muted); font-size: 16px; margin-top: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h3 { margin-top: 0; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+  .kv b { color: var(--muted); font-weight: 500; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font: 13px/1.5 var(--mono); }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0 12px; }
+  th, td { text-align: left; vertical-align: top; padding: 7px 9px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .ok { color: var(--ok); font-weight: 600; } .warn { color: var(--warn); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+  .why { border-left: 3px solid var(--warn); padding: 8px 14px; margin: 10px 0; color: var(--fg); }
+  .why b { color: var(--warn); }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 38px; margin: 10px 0; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 600; display: grid; place-items: center; font-size: 13px; }
+  .timeline { border-left: 2px solid var(--line); margin-left: 8px; padding-left: 18px; }
+  .timeline div { position: relative; margin: 0 0 14px; }
+  .timeline div::before { content: ""; position: absolute; left: -24px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+  .timeline time { color: var(--muted); font-size: 13px; }
+  .mermaid { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 10px 0; overflow-x: auto; }
+  .pager { display: flex; justify-content: space-between; margin-top: 36px; }
+  .pager a { color: var(--accent); text-decoration: none; }
+  details summary { cursor: pointer; color: var(--accent); }
+  @media print { header { position: static; } section.page { display: block !important; page-break-after: always; } .pager { display: none; } }
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <span class="brand">dsh-signal-integrity <small>learning log · 2026-09-06</small></span>
+  <nav>
+    <a href="#overview">1 Overview</a>
+    <a href="#harness">2 DSH anatomy</a>
+    <a href="#built">3 What was built</a>
+    <a href="#how">4 How it works</a>
+    <a href="#why">5 Why this way</a>
+    <a href="#quality">6 Quality &amp; real data</a>
+    <a href="#lessons">7 Lessons</a>
+    <a href="#next">8 What's next</a>
+    <a href="#glossary">9 Glossary</a>
+  </nav>
+</div></header>
+<main>
+
+<!-- ============================================================ 1 -->
+<section class="page" id="overview">
+  <h1>An unofficial DeepSeek Harness plugin for Touchstone analysis</h1>
+  <p class="lead">A record of what was built, how DSH loads and runs it, why each design choice was made, and what remains. Written for the domain owner who will fill in the physics.</p>
+
+  <div class="grid">
+    <div class="card"><h3>Goal</h3>
+      Turn a Touchstone file into an agent-guided signal-integrity report: inspect, ask the engineer what the file cannot say (device, port roles, pairing), run the right extraction, hand back plots and data. Public evidence for agent development, SI/CEM, software engineering, and AI-for-EDA.</div>
+    <div class="card"><h3>Status</h3>
+      <div class="kv">
+        <b>Milestone 1</b><span>merged · scaffold, <code>si_ready</code>, CI</span>
+        <b>Milestone 2</b><span>PR #2 open · <code>si_inspect</code>, P370 quality, examples</span>
+        <b>Milestone 3</b><span>branch open · <code>lumped.py</code> contract awaits equations</span>
+        <b>Tests</b><span>21 pytest · 19 vitest · 4 CI cells green</span>
+      </div></div>
+    <div class="card"><h3>Repository</h3>
+      <div class="kv">
+        <b>Plugin</b><span>github.com/jiezheng5/dsh-signal-integrity</span>
+        <b>Runtime</b><span>local checkout of deepseek-harness 0.1.3-alpha.1 (read-only)</span>
+        <b>Published DSH</b><span><code>npx @deepseek-ai/dsh</code> 0.1.2-rc.1</span>
+        <b>Label</b><span>unofficial community plugin; no upstream merge claimed</span>
+      </div></div>
+  </div>
+
+  <h2>Timeline (all on 2026-09-06)</h2>
+  <div class="timeline">
+    <div><time>12:40</time> Plan review: original plan verified against DSH source; 12 corrections found (subprocess has no timeout or rlimits and runs unsandboxed, Config must be Schemastery, peers external, github installs need <code>allowBuilds</code>, …).</div>
+    <div><time>13:00</time> Milestone 1: package, Python worker over uv, JSON protocol, <code>si_ready</code>, fake-worker + real-uv tests, CI. Installed into the <code>web</code> profile; <code>dsh web</code> boots.</div>
+    <div><time>13:45</time> First real-model call: DeepSeek-V4-Flash calls <code>si_ready</code>, worker reports scikit-rf 2.1.0, NumPy 2.5.3, SciPy 1.18.1, Matplotlib 3.11.1.</div>
+    <div><time>13:50</time> Secrets moved to <code>~/.dsh/.env</code>; milestone 2 branch: Touchstone loader, quality checks, <code>si_inspect</code>, six synthetic examples.</div>
+    <div><time>14:10</time> IEEE P370 metrics adopted from scikit-rf with the standard's bands; causality placeholder removed. <code>lumped.py</code> contract with strict-xfail tests handed to the domain owner.</div>
+    <div><time>14:20</time> 2.8 GB of Keysight measurements arrive in <code>examples/realdata</code>; kept out of git; three files inspected for this log.</div>
+  </div>
+  <div class="pager"><span></span><a href="#harness">Next: DSH anatomy →</a></div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section class="page" id="harness">
+  <h1>DeepSeek Harness anatomy, as seen from a plugin</h1>
+  <p class="lead">DSH is a Cordis application: everything is a plugin that provides or injects services. A community plugin is an npm package that Cordis loads by name.</p>
+
+  <h2>The plugin shape</h2>
+  <pre><code>// src/index.ts — the whole contract Cordis needs
+export const name = 'signal-integrity'          // row id in the composed config
+export const inject = ['tools', 'subprocess']   // services this plugin needs before apply() runs
+export const Config = Schema.object({ ... })    // Schemastery: validated + defaulted at load
+export function apply(ctx: Context, config: Config) {
+  const worker = new WorkerClient(ctx, config)
+  registerReadyTool(ctx, worker, config)        // ctx.tools.register(defineTool({...}))
+  registerInspectTool(ctx, worker, config)
+}</code></pre>
+  <div class="why"><b>Why Schemastery, not zod?</b> Cordis validates <code>Config</code> through the Standard Schema interface at load time. A zod object fails that check and the plugin never mounts. The docs say it; the code confirms it.</div>
+
+  <h2>How a plugin reaches the model</h2>
+  <div class="mermaid">
+flowchart LR
+  P[npm package<br/>dsh-signal-integrity] -->|dsh plugin add| PR[Profile<br/>~/.dsh/profiles/web]
+  PR -->|dsh.profile.bundles| L[Loader composes layers]
+  B[dsh-base patch] --> L
+  W[dsh-web-app patch] --> L
+  C[cordis.patch.yml<br/>insert: signal-integrity] --> L
+  L -->|import lib/index.js| A[apply ctx config]
+  A -->|ctx.tools.register| R[Tool registry]
+  R -->|JSON schema| M[Model sees si_ready, si_inspect]
+  </div>
+  <p>Layer order: each bundle's patch in list order → the profile's <code>cordis.patch.yml</code> → <code>$DSH_HOME/cordis.patch.yml</code> → <code>--patch</code> overlays. A patch replaces a row's whole <code>config</code>, never deep-merges.</p>
+  <div class="note">The model sees only what is in the <em>built</em> <code>lib/index.js</code>. Editing <code>src/</code> does nothing until <code>pnpm build</code> and a profile restart. This bit us once: the model saw <code>si_ready</code> only, then read the plugin source and drove the worker by hand.</div>
+
+  <h2>The tool pipeline</h2>
+  <div class="mermaid">
+sequenceDiagram
+  participant Model
+  participant Registry as ctx.tools
+  participant Tool as si_inspect.execute
+  participant Sub as ctx.subprocess
+  Model->>Registry: tool_call si_inspect {path}
+  Registry->>Registry: validate args against parameters spec
+  Registry->>Tool: execute(args, exec{signal, callId})
+  Tool->>Sub: spawn(uv run … python -m dsh_si) stdin=JSON
+  Sub-->>Tool: done + collected stdout/stderr
+  Tool-->>Registry: canonical value (validated against output.schema)
+  Registry->>Registry: output.render(args, value) → content blocks
+  Registry-->>Model: text (+ image blocks later)
+  </div>
+  <table>
+    <tr><th>Piece</th><th>What it does</th><th>Where verified</th></tr>
+    <tr><td><code>defineTool.parameters</code></td><td>DSH's own flat property spec (not JSON Schema, not zod); compiled to JSON Schema internally. Object nodes must state <code>additionalProperties</code>.</td><td><code>packages/core/tools/src/schema.ts</code></td></tr>
+    <tr><td><code>execute(args, exec)</code></td><td>Returns one canonical JSON value or throws. <code>exec.signal</code> is the caller-owned cancellation.</td><td><code>packages/core/tools/src/index.ts</code></td></tr>
+    <tr><td><code>timeoutMs</code></td><td>Cooperative budget enforced by a separate timeout-policy plugin mounted by dsh-base.</td><td><code>packages/bundle/base/cordis.patch.yml</code></td></tr>
+    <tr><td><code>ctx.subprocess.spawn</code></td><td><code>argv, cwd, stdio, graceMs, signal, env</code>. No timeout field, no rlimits, no sandbox.</td><td><code>packages/subprocess/subprocess/src/types.ts</code></td></tr>
+    <tr><td><code>ask_user_question</code></td><td>Built-in tool over <code>ctx.userQuestions</code>; blocks until the human answers.</td><td><code>packages/interaction/tool-ask-user</code></td></tr>
+    <tr><td><code>ctx.attachments.saveImage</code></td><td>Persist a PNG and return an <code>image</code> content block (used from milestone 3).</td><td><code>packages/fs/tool-fs/src/read-image.ts</code></td></tr>
+  </table>
+
+  <h2>Profiles and credentials</h2>
+  <pre><code>~/.dsh/
+├── profiles/web/package.json   # dsh.profile.bundles: [dsh-base, dsh-web-app, dsh-signal-integrity]
+├── profiles/web/cordis.patch.yml
+├── settings.yaml               # llm-pi-ai providers (openai route via apiKeyEnv)
+├── .env                        # DEEPSEEK_API_KEY=…  (mode 600; read as a launch layer)
+└── .credentials.yaml           # keys saved through the Models page</code></pre>
+  <p>Credential resolution order: inherited environment → <code>.credentials.yaml</code> → invoking directory <code>.env</code> → <code>$DSH_HOME/.env</code>. The URL <code>dsh web</code> prints carries a per-launch browser-trust token: local-only, rotates on restart, never to be pasted anywhere.</p>
+  <div class="pager"><a href="#overview">← Overview</a><a href="#built">Next: What was built →</a></div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section class="page" id="built">
+  <h1>What was built</h1>
+  <p class="lead">Two milestones merged or in review, one opened. Every commit is small and named for its change.</p>
+
+  <h2>Repository layout</h2>
+  <pre><code>dsh-signal-integrity/
+├── src/
+│   ├── index.ts            # name / inject / Config / apply
+│   ├── config.ts           # Schemastery Config (uvPath, timeoutMs, maxMemoryMb, tolerances, …)
+│   ├── protocol.ts         # wire constants + parseWorkerResponse (mirrored in Python)
+│   ├── worker.ts           # WorkerClient: spawn via ctx.subprocess, one process per call
+│   ├── format.ts           # Hz / complex formatting for renderers
+│   └── tools/
+│       ├── ready.ts        # si_ready: environment probe, remedies as results
+│       └── inspect.ts      # si_inspect: metadata, quality, warnings, questions
+├── python/
+│   ├── pyproject.toml      # uv project: scikit-rf, numpy, scipy, matplotlib (uv.lock pinned)
+│   ├── dsh_si/
+│   │   ├── __main__.py     # stdin JSON → dispatch → stdout JSON; RLIMIT_AS self-cap
+│   │   ├── protocol.py     # PROTOCOL_VERSION, COMMANDS, ERROR_CODES, WorkerError
+│   │   ├── touchstone.py   # resolve_path, sha256, load() with metadata + warnings
+│   │   ├── quality.py      # P370 metrics (scikit-rf) + exact per-frequency checks
+│   │   ├── inspect.py      # inspect command; builds ask_user_question-shaped questions
+│   │   ├── lumped.py       # ← YOUR FILE: L/Q, C, SRF, region policy (NotImplementedError stubs)
+│   │   └── ready.py
+│   ├── scripts/gen_examples.py
+│   └── tests/              # fixtures.py, test_protocol.py, test_inspect.py, test_lumped.py (xfail)
+├── tests/                  # vitest: harness.ts, ready.spec.ts, inspect.spec.ts, protocol-mirror.spec.ts
+│   └── fixtures/fake-worker.mjs
+├── examples/synthetic/     # six generated .sNp with expected results
+├── examples/realdata/      # 2.8 GB Keysight measurements — gitignored
+├── cordis.patch.yml        # - insert: [{ id: signal-integrity, name: dsh-signal-integrity }]
+├── package.json            # dsh.bundle.patch, peerDependencies on @deepseek-ai/*
+└── .github/workflows/ci.yml# Node 22.19/24 × Python 3.12/3.13</code></pre>
+
+  <h2>Milestone 1 · scaffold (PR #1, merged)</h2>
+  <ul>
+    <li>Installable bundle; <code>dsh plugin --profile web add ../dsh-signal-integrity</code> writes a <code>link:</code> dependency and the bundle row.</li>
+    <li><code>si_ready</code> spawns <code>uv run --project &lt;plugin&gt;/python --frozen --no-dev python -m dsh_si</code> and reports interpreter and package versions. A broken environment is a <em>result</em> with a remedy, not an exception.</li>
+    <li>Cancellation: <code>exec.signal</code> → <code>spawn({signal, graceMs})</code> → SIGTERM then SIGKILL on the process tree; the test asserts no survivor via <code>pgrep</code>.</li>
+    <li>Tests never need a model or key: a bare <code>Context</code> + <code>SystemPrompt</code> + <code>ToolRuntime</code> + <code>LocalSubprocessRuntime</code>, then <code>ctx.tools.execute(...)</code>.</li>
+  </ul>
+
+  <h2>Milestone 2 · inspection (PR #2, open)</h2>
+  <ul>
+    <li><code>si_inspect(path)</code>: sha256, header metadata (ports, span, unit, format, reference impedance, version, comments, mixed-mode hint), quality block, warnings, <code>questions</code>, <code>required_by_device</code>.</li>
+    <li>Quality: IEEE P370 PQMi/RQMi/CQMi with bands from scikit-rf, plus exact worst-point passivity and reciprocity.</li>
+    <li>Rejections with structured codes: relative path, missing file, wrong suffix, malformed data, non-monotonic frequency, NaN.</li>
+    <li>Synthetic examples: lossy line, series RL, uncoupled 4-port, anti-causal, active, non-reciprocal.</li>
+  </ul>
+
+  <h2>Milestone 3 · lumped extraction (branch open)</h2>
+  <ul>
+    <li><code>python/dsh_si/lumped.py</code>: five documented functions raising <code>NotImplementedError</code>; <code>tests/test_lumped.py</code> holds analytic RL, floating-element, capacitor, and RLC-resonance checks as <code>xfail(strict=True, raises=NotImplementedError)</code>.</li>
+    <li>Coming from the agent side: <code>si_analyze</code> skeleton, <code>report.py</code> (Matplotlib PNGs, HTML, CSV, results JSON), inline image return, an |S| overview plot for <code>si_inspect</code>.</li>
+  </ul>
+
+  <h2>Commit log (branch <code>feat/lumped-extraction</code>)</h2>
+  <pre><code>chore: keep local realdata measurements out of the repo
+test: rename ambiguous variables in lumped tests
+feat(python): lumped extraction contract for the domain owner
+feat(python): adopt IEEE P370 quality metrics with evaluation bands
+docs: note rebuild + restart after TypeScript changes
+docs: README for si_inspect, credentials via .env, quality-check table
+feat: si_inspect tool
+feat: synthetic Touchstone examples with generator script
+feat(python): inspect command with agent questions
+feat(python): Touchstone loader and quality checks
+chore: ignore Playwright scratch directory
+feat: scaffold signal integrity plugin           (PR #1)</code></pre>
+  <div class="pager"><a href="#harness">← DSH anatomy</a><a href="#how">Next: How it works →</a></div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section class="page" id="how">
+  <h1>How it works, end to end</h1>
+  <p class="lead">One conversation, three hops: the model, the TypeScript tool, the Python worker.</p>
+
+  <div class="mermaid">
+sequenceDiagram
+  participant U as Engineer
+  participant M as Model (DeepSeek-V4-Flash)
+  participant I as si_inspect (TS)
+  participant W as dsh_si worker (Python)
+  participant Q as ask_user_question
+  U->>M: "Inspect lossy_line_20mm.s2p"
+  M->>I: si_inspect{path}
+  I->>W: {"protocol":1,"command":"inspect","payload":{path,tolerances},"limits":{max_memory_mb}}
+  W->>W: sha256 · skrf.Network · P370 metrics · exact checks · build questions
+  W-->>I: {"ok":true,"result":{hash,metadata,quality,warnings,questions,required_by_device}}
+  I-->>M: rendered text incl. questions JSON + "pass hash to si_analyze"
+  M->>Q: ask_user_question{questions}   (array forwarded verbatim)
+  Q-->>U: Device? Port roles?
+  U-->>Q: transmission_line / through
+  Q-->>M: answers
+  M->>M: si_analyze{path, hash, interpretation}   (milestone 3)
+  </div>
+
+  <h2>The wire protocol (mirrored, tested)</h2>
+  <pre><code>request  = { protocol: 1, command: 'ready'|'inspect'|'analyze', payload: {...}, limits: { max_memory_mb? } }
+response = { protocol: 1, ok: true,  result: {...} }
+         | { protocol: 1, ok: false, error: { code, message, detail? } }
+codes    = bad_request | unsupported_command | file_not_found | parse_error | unsupported_format
+         | interpretation_invalid | hash_mismatch | numerical_error | report_write_failed | internal</code></pre>
+  <p><code>tests/protocol-mirror.spec.ts</code> spawns the worker and asserts the Python constants equal the TypeScript ones, so drift fails CI instead of failing at a user's desk.</p>
+
+  <h2>Error routing</h2>
+  <pre><code>WorkerClient.call
+  spawn fails / ENOENT ........ WorkerError('spawn_failed')  → si_ready: "uv not found: install uv or set pythonCommand"
+  signal aborted .............. WorkerError('cancelled')     → rethrown; tool result isError
+  no stdout, non-zero exit .... WorkerError('crashed')       → "worker produced no response (exit code 3)" + stderr tail
+  stdout not JSON / wrong ver . WorkerError('protocol')
+  ok:false .................... WorkerError(code from worker)
+
+si_inspect.execute
+  code ∈ {bad_request, file_not_found, parse_error, unsupported_format} → throw Error(message)   (about the file)
+  any other WorkerError (not cancelled) → throw Error("worker failed (code) … Call si_ready")   (about the environment)</code></pre>
+
+  <h2>Resource control without help from the seam</h2>
+  <table>
+    <tr><th>Concern</th><th>Mechanism</th><th>Owner</th></tr>
+    <tr><td>Wall-clock</td><td><code>defineTool({ timeoutMs })</code> aborts <code>exec.signal</code>; spawn forwards it</td><td>DSH timeout policy + plugin</td></tr>
+    <tr><td>Memory</td><td>Worker calls <code>resource.setrlimit(RLIMIT_AS)</code> from <code>limits.max_memory_mb</code></td><td>Python worker (Linux/macOS)</td></tr>
+    <tr><td>Output size</td><td><code>stdout/stderr: { maxBytes }</code> collected with offset readers</td><td>subprocess seam</td></tr>
+    <tr><td>Process tree</td><td><code>graceMs</code> SIGTERM → SIGKILL on the detached group</td><td>subprocess-local</td></tr>
+    <tr><td>Filesystem</td><td>None enforced; the worker reads the given path, writes under <code>outputDir</code></td><td>documented assumption</td></tr>
+  </table>
+  <div class="pager"><a href="#built">← What was built</a><a href="#why">Next: Why this way →</a></div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section class="page" id="why">
+  <h1>Why this way</h1>
+  <p class="lead">Each decision, the alternative it beat, and the evidence.</p>
+  <table>
+    <tr><th>Decision</th><th>Alternative rejected</th><th>Reason</th></tr>
+    <tr><td>Standalone community plugin repo</td><td>PR into deepseek-harness</td><td>CONTRIBUTING says external PRs are not accepted and asks for independent repos with the <code>dsh-plugin</code> topic.</td></tr>
+    <tr><td>Python via <code>uv run --project … --frozen</code></td><td>Ask users to pip-install; bundle wheels</td><td><code>uv.lock</code> pins scikit-rf/NumPy/SciPy/Matplotlib exactly; first call syncs a venv; <code>pythonCommand</code> overrides for hand-managed interpreters.</td></tr>
+    <tr><td>One worker process per tool call</td><td>Long-lived daemon with JSON-RPC</td><td>Cancellation becomes "kill the tree"; no state to leak; DSH's seam offers no session primitive anyway. Cost: ~1 s startup per call.</td></tr>
+    <tr><td><code>@deepseek-ai/*</code> as peerDependencies, external in tsdown</td><td>Regular dependencies</td><td>Profiles install with <code>autoInstallPeers: false</code> so the plugin shares the installation's single Cordis instance instead of a duplicate.</td></tr>
+    <tr><td>Schemastery <code>Config</code></td><td>zod</td><td>Cordis validates through Standard Schema at load; zod fails the check.</td></tr>
+    <tr><td>Questions returned as data shaped for <code>ask_user_question</code></td><td>Tool calls <code>ctx.userQuestions.ask</code> itself</td><td>The direct call throws <code>DELEGATED_CALLER</code> inside subagents; forwarding keeps the model in the loop and the tool pure.</td></tr>
+    <tr><td>Hash hand-off between <code>si_inspect</code> and <code>si_analyze</code></td><td>Server-side session state</td><td>Statefulness the model can carry; <code>si_analyze</code> refuses if the file changed underneath.</td></tr>
+    <tr><td>Not-ready environment is a <em>result</em>, cancellation is an <em>error</em></td><td>Throw for everything</td><td>DSH's contract: throw for infrastructure, represent domain outcomes in the canonical value. Diagnosis is <code>si_ready</code>'s domain.</td></tr>
+    <tr><td>IEEE P370 via scikit-rf + exact checks</td><td>Hand-rolled thresholds only</td><td>scikit-rf is the only open-source Python P370 implementation and carries the standard's bands; exact checks add the worst frequency.</td></tr>
+    <tr><td>Placeholders as strict-xfail tests</td><td>TODO comments</td><td>CI stays green now and fails the moment code lands without removing the marker; the contract cannot rot silently.</td></tr>
+    <tr><td>Tarball as primary install path</td><td><code>github:user/repo#tag</code></td><td>Git installs need a <code>prepare</code> build and an <code>allowBuilds</code> allowance; the docs recommend pinning a sha. Tarball needs neither.</td></tr>
+    <tr><td>Secrets in <code>~/.dsh/.env</code> (mode 600)</td><td>Export in shell</td><td>DSH reads it as a launch layer; nothing in history or chat.</td></tr>
+    <tr><td>Realdata gitignored</td><td>Commit measurements</td><td>2.8 GB and unknown redistribution rights. A curated, cleared subset can be added deliberately later.</td></tr>
+  </table>
+  <div class="pager"><a href="#how">← How it works</a><a href="#quality">Next: Quality &amp; real data →</a></div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section class="page" id="quality">
+  <h1>Quality checks and the first real data</h1>
+  <p class="lead">What each metric means, what its number is, and what three real measurements say.</p>
+
+  <h2>Two layers per check</h2>
+  <table>
+    <tr><th>Check</th><th>IEEE P370 metric (0–100 %, bands)</th><th>Exact detail</th></tr>
+    <tr><td>Passivity</td><td>PQMi: share of frequency points where the 2-norm of S ≤ 1. Bands: &gt;99.9 good · &gt;99 acceptable · &gt;80 inconclusive · else poor.</td><td>largest singular value of S per point vs <code>1 + tol</code>; worst point, violating count</td></tr>
+    <tr><td>Reciprocity</td><td>RQMi: integrated |Sij − Sji| difference.</td><td>max |Sij − Sji| per point vs <code>tol</code>; worst point, violating count</td></tr>
+    <tr><td>Causality</td><td>CQMi: share of consecutive-frequency S vectors rotating clockwise in the complex plane. Screening only; sensitive to sampling.</td><td>none (no exact per-point form on sampled data)</td></tr>
+  </table>
+  <div class="note">One-ports: scikit-rf's P370 metrics need off-diagonal terms and raise; the exact passivity check still runs.</div>
+
+  <h2>Three real files through <code>inspect</code></h2>
+  <table>
+    <tr><th>File</th><th>Shape</th><th>Passivity</th><th>Reciprocity</th><th>Causality</th><th>What it likely means</th></tr>
+    <tr><td><code>QSFPDD IL_NR1.S4P</code><br><span class="tag">Keysight N5224B, 2020</span></td><td>4-port · 3200 pts · 10 MHz–32 GHz · RI</td>
+      <td><span class="warn">2 points</span> σ<sub>max</sub> 1.0253 · P370 good (99.99 %)</td>
+      <td><span class="bad">all 3200 points</span> max |Sij−Sji| 0.447 · P370 poor (0 %)</td>
+      <td><span class="bad">P370 poor (0.02 %)</span></td>
+      <td>A passive connector cannot be that non-reciprocal. The header lists a full 4-port correction, but the stored matrix is not symmetric: likely a partial or re-arranged dataset (an "IL" export). <b>Your read?</b></td></tr>
+    <tr><td><code>USB4_Type-C_10001-7H_Ori_USB4.s16p</code></td><td>16-port · 2001 pts · DC–20 GHz · MA</td>
+      <td><span class="warn">4 points</span> σ<sub>max</sub> 1.0040 · P370 good (99.99 %)</td>
+      <td><span class="ok">pass</span> max 0.0 · P370 good</td>
+      <td><span class="warn">P370 acceptable (72.3 %)</span></td>
+      <td>Exactly symmetric data (simulated or symmetrized); a few mildly active points near DC/top; the DC start warning fires. Typical simulation export.</td></tr>
+    <tr><td><code>wr2p2,line.s2p</code></td><td>2-port · 201 pts · 330–500 GHz · RI</td>
+      <td><span class="ok">pass</span> σ<sub>max</sub> 1.000 · P370 good</td>
+      <td><span class="ok">pass</span></td>
+      <td><span class="ok">P370 good (100 %)</span></td>
+      <td>WR-2.2 waveguide line standard: clean, lossless-looking, causal.</td></tr>
+  </table>
+  <div class="why"><b>Interpretation stays with the engineer.</b> The plugin flags; the questions it returns (<code>device</code>, <code>topology</code> for the 4- and 16-ports; <code>terminal_mode</code> for the 2-port) are how the agent asks you before doing anything device-specific.</div>
+
+  <h2>Run it yourself</h2>
+  <pre><code>cd python
+printf '{"protocol":1,"command":"inspect","payload":{"path":"/abs/path/file.s4p"},"limits":{}}' \
+  | uv run --frozen --no-dev --quiet python -m dsh_si | python3 -m json.tool | head -60</code></pre>
+  <div class="pager"><a href="#why">← Why this way</a><a href="#lessons">Next: Lessons →</a></div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section class="page" id="lessons">
+  <h1>Lessons and gotchas</h1>
+  <p class="lead">Things that cost time today, recorded so they cost nothing tomorrow.</p>
+  <ol class="steps">
+    <li><b>Rebuild before you demo.</b> The linked profile loads <code>lib/index.js</code>. After a TypeScript change: <code>pnpm build</code>, restart <code>dsh web</code>. Otherwise the model sees stale tools and improvises.</li>
+    <li><b>inotify exhaustion on this host.</b> <code>dsh web</code> crashed with <code>ENOSPC</code> from the live config watcher. The profile now uses <code>patchReload: startup</code>; raising <code>fs.inotify.max_user_instances</code> needs sudo.</li>
+    <li><b><code>pkill -f</code> kills its own shell.</b> The pattern matched the bash command line that contained it. Use a bracketed character class: <code>pkill -f 'bin\.ts web --port 309[9]'</code>.</li>
+    <li><b>Never paste the browser-trust URL.</b> It authorizes a browser to the local server. Local-only and rotating, but a secret nonetheless.</li>
+    <li><b>Shell <code>cd</code> persists across tool calls.</b> A <code>cd python &amp;&amp; …</code> chain silently skipped its edits once because the shell was already in <code>python/</code>. Use absolute paths.</li>
+    <li><b>Published packages lag the checkout.</b> npm has <code>0.1.2-rc.1</code>, the dev runtime is <code>0.1.3-alpha.1</code>. Peer ranges are <code>&gt;=0.1.2-rc.1 &lt;0.2.0</code>; tests run against the published versions.</li>
+    <li><b>The model will go around a missing tool.</b> Given only <code>si_ready</code>, DeepSeek read the worker source and called it through bash. Impressive, and a reminder that tool availability, not instructions, defines the workflow.</li>
+    <li><b>scikit-rf P370 refuses one-ports.</b> Every metric, not just reciprocity. Report "not applicable" and keep the exact passivity check.</li>
+    <li><b>Real files break assumptions.</b> A 4-port with |Sij−Sji| = 0.45 everywhere is a data-provenance question, not a physics result. The screen exists for exactly this.</li>
+  </ol>
+  <div class="pager"><a href="#quality">← Quality</a><a href="#next">Next: What's next →</a></div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section class="page" id="next">
+  <h1>What's next</h1>
+  <p class="lead">Your part, my part, and the release.</p>
+
+  <div class="grid">
+    <div class="card"><h3>Your part · <code>python/dsh_si/lumped.py</code></h3>
+      <table>
+        <tr><th>Function</th><th>Returns</th></tr>
+        <tr><td><code>impedance_from_network(network, terminal_mode)</code></td><td>complex Z(f): <code>one_port</code> → Z11; <code>two_terminal_differential</code> → Z11+Z22−Z12−Z21; decide <code>through</code></td></tr>
+        <tr><td><code>inductor_lq(z, f)</code></td><td><code>L_h</code>, <code>Q</code>, <code>R_ohm</code> (NaN where undefined)</td></tr>
+        <tr><td><code>capacitor_c(z, f)</code></td><td><code>C_f</code>, <code>ESR_ohm</code> (NaN when inductive)</td></tr>
+        <tr><td><code>self_resonance_hz(z, f)</code></td><td>first Im(Z) sign change or None</td></tr>
+        <tr><td><code>classify_region(z, f, device)</code></td><td>one label per point: valid / near_srf / beyond_srf / wrong_sign / dc</td></tr>
+      </table>
+      Workflow: implement → delete that test's <code>@PENDING</code> marker in <code>tests/test_lumped.py</code> → <code>uv run --frozen pytest</code>.</div>
+    <div class="card"><h3>My part · milestone 3</h3>
+      <ul>
+        <li><code>si_analyze</code>: interpretation validation per device, hash check, report directory, <code>results.json</code> with versions/settings/warnings.</li>
+        <li><code>report.py</code>: Matplotlib PNGs (units, port names, assumptions in titles), HTML with embedded plots, CSV.</li>
+        <li>Inline image return via <code>ctx.attachments.saveImage</code>; |S| overview plot for <code>si_inspect</code>.</li>
+        <li>Fake-worker and real-uv tests as before.</li>
+      </ul></div>
+    <div class="card"><h3>Milestone 4 · interconnects</h3>
+      <ul>
+        <li>Transmission line: IL, RL, Z<sub>c</sub> = √(B/C) with <b>your</b> branch-selection policy (<code>select_zc_branch</code>).</li>
+        <li>Differential via <code>se2gmm</code> after explicit pairing and polarity; preserve converted reference impedances; never convert twice.</li>
+        <li>Interposer/connector: per-port RL and every directed through term grouped by source port. Your QSFP-DD and USB4 sets become the acceptance data once a redistributable subset is cleared.</li>
+      </ul></div>
+    <div class="card"><h3>Milestone 5 · release v0.1.0</h3>
+      <ul>
+        <li>Loader integration test booting the shipped <code>web</code> profile with a scripted <code>LlmAdapter</code>.</li>
+        <li><code>pnpm pack</code> tarball on the GitHub release; clean-profile install with <code>npx @deepseek-ai/dsh</code>.</li>
+        <li>README: 30–60 s GIF, architecture diagram, examples table with tolerances, known limits. Topics: <code>dsh-plugin</code>, <code>signal-integrity</code>, <code>touchstone</code>, <code>scikit-rf</code>.</li>
+        <li>Discussion post only after verifying the category and title format live.</li>
+      </ul></div>
+  </div>
+
+  <h2>Open questions for you</h2>
+  <ul>
+    <li>What does the QSFP-DD "IL" export actually contain? If it is a subset, the interposer analysis should accept partial matrices explicitly rather than trusting reciprocity.</li>
+    <li>Which files in <code>examples/realdata</code> may be redistributed? A cleared handful (one cable, one connector, one waveguide standard) would replace synthetic data in the README.</li>
+    <li><code>through</code> terminal mode for lumped elements: support the series-in-a-through-fixture formula now, or defer to fixture de-embedding as the plan says?</li>
+  </ul>
+  <div class="pager"><a href="#lessons">← Lessons</a><a href="#glossary">Next: Glossary →</a></div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section class="page" id="glossary">
+  <h1>Glossary</h1>
+  <table>
+    <tr><th>Term</th><th>Meaning here</th></tr>
+    <tr><td>Cordis</td><td>The plugin/service framework DSH is built on. A plugin exports <code>name</code>, <code>inject</code>, <code>apply</code>, optionally <code>Config</code>.</td></tr>
+    <tr><td>Context (<code>ctx</code>)</td><td>The handle a plugin receives; services hang off it (<code>ctx.tools</code>, <code>ctx.subprocess</code>, <code>ctx.attachments</code>, <code>ctx.logger</code>).</td></tr>
+    <tr><td>Profile</td><td>A named DSH installation under <code>~/.dsh/profiles/&lt;name&gt;</code> with its bundle list and patch file.</td></tr>
+    <tr><td>Bundle</td><td>An npm package declaring <code>dsh.bundle.patch</code>; its patch inserts rows into the composed config.</td></tr>
+    <tr><td>Patch layer</td><td>YAML list of inserts/overrides applied in order; an override replaces a row's whole <code>config</code>.</td></tr>
+    <tr><td>Tool</td><td>A <code>defineTool</code> definition the model can call; validated args in, canonical value out, rendered to content blocks.</td></tr>
+    <tr><td>Canonical value</td><td>The JSON the tool returns; validated against <code>output.schema</code>, persisted, then rendered.</td></tr>
+    <tr><td>Worker</td><td>The Python process (<code>python -m dsh_si</code>) that does all numerical work; one per tool call.</td></tr>
+    <tr><td>Touchstone</td><td>Text S-parameter format (<code>.sNp</code>, <code>.ts</code>); header sets unit, parameter, format, reference impedance.</td></tr>
+    <tr><td>IEEE P370</td><td>Standard for fixture de-embedding and S-parameter data quality up to 50 GHz; its frequency-domain quality metrics are implemented in scikit-rf.</td></tr>
+    <tr><td>PQMi / RQMi / CQMi</td><td>P370 initial passivity, reciprocity, causality quality metrics (percent).</td></tr>
+    <tr><td>Mixed-mode</td><td>Differential/common-mode representation (Sdd, Sdc, Scd, Scc) obtained from single-ended data via <code>se2gmm</code> after explicit pairing.</td></tr>
+    <tr><td>SRF</td><td>Self-resonant frequency: where Im(Z) of a lumped element changes sign.</td></tr>
+    <tr><td>uv</td><td>Python package/project manager; <code>uv run --project … --frozen</code> guarantees the locked environment.</td></tr>
+    <tr><td>strict xfail</td><td>pytest marker: the test must fail now; an unexpected pass fails the suite, forcing the marker's removal when the code lands.</td></tr>
+  </table>
+  <div class="pager"><a href="#next">← What's next</a><span></span></div>
+</section>
+
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js" integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2" crossorigin="anonymous"></script>
+<script>
+(function () {
+  const pages = Array.from(document.querySelectorAll('section.page'));
+  const links = Array.from(document.querySelectorAll('nav a'));
+  function show() {
+    const id = (location.hash || '#overview').slice(1);
+    let found = false;
+    pages.forEach(p => { const on = p.id === id; p.classList.toggle('active', on); found = found || on; });
+    if (!found) { pages[0].classList.add('active'); }
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + (found ? id : 'overview')));
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', show);
+  show();
+  if (window.mermaid) {
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral' });
+  } else {
+    document.querySelectorAll('.mermaid').forEach(el => { el.style.whiteSpace = 'pre'; el.style.fontFamily = 'monospace'; });
+  }
+})();
+</script>
+</body>
+</html>
