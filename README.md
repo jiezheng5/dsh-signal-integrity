@@ -6,7 +6,7 @@ Turns Touchstone S-parameter files into agent-guided signal-integrity reports: t
 
 ## Status
 
-Milestone 2 of 5 (Touchstone inspection). `si_ready` probes the Python worker and `si_inspect` parses, hashes, and quality-screens a Touchstone file, then hands the agent the questions it must ask before analysis. Lumped-element extraction and interconnect analysis follow in later pull requests; see [the plan](docs/plans/dsh-signal-integrity-plan.md).
+Milestone 3 of 5 (analysis pipeline and reports). `si_ready` probes the Python worker; `si_inspect` parses, hashes, and quality-screens a file, returns an |S| overview plot, and hands the agent the questions it must ask; `si_analyze` validates the answers, refuses a changed file, and writes a report directory (PNG, results.json, HTML). The lumped-element equations (`python/dsh_si/lumped.py`) and interconnect analyses are still pending, so `si_analyze` currently reports `status: overview_only`. See [the plan](docs/plans/dsh-signal-integrity-plan.md) and the [learning log](docs/learning-log.html).
 
 ## How it works
 
@@ -25,7 +25,7 @@ Tools (model-facing):
 |---|---|
 | `si_ready` | Probe uv, the Python interpreter, and the scientific packages; explain any missing piece with the exact remedy. |
 | `si_inspect` | Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and return the interpretation questions (shaped for `ask_user_question`) the agent must ask. |
-| `si_analyze` | *(milestones 3–4)* Run the device-specific extraction once the interpretation is complete, and write the report. |
+| `si_analyze` | Validate the interpretation (device, terminal mode, ports, pairs, paths), refuse a changed file by hash, run the device analysis that exists, and write `<outputDir>/analyze/<file>-<hash8>-<stamp>/` with `s_magnitude.png`, `results.json`, `report.html`. Returns a bounded summary and the key plot inline. |
 
 ## Install
 
@@ -82,6 +82,10 @@ pnpm check          # typecheck, vitest, ruff, pytest
 A profile that links this checkout loads `lib/index.js`, so run `pnpm build` and restart `dsh web` after changing TypeScript; the model only sees tools that exist in the built bundle.
 
 The TypeScript tests mount the plugin on a real DSH tool registry and the real local subprocess provider, with no model or API key. Most use a fake worker (`tests/fixtures/fake-worker.mjs`) to exercise framing, error classification, and cancellation; two tests run the real worker through uv and skip when uv is absent.
+
+## Reports and plots
+
+Every `si_analyze` call leaves a directory under `outputDir` (default `~/.dsh/si-reports/analyze/`): the |S| overview PNG, `results.json` (input hash, library versions, settings, quality, warnings, summary), and a self-contained `report.html`. `si_inspect` writes the same overview under `inspect/`. When DSH's attachment service is mounted (it is in the web profile) the plot also comes back inline in the chat as an image; otherwise the path is reported. Plots follow one rule set: one axis, fixed eight-color order (reflections first, then the strongest transmissions), units on every axis, assumptions in the subtitle.
 
 ## Quality checks
 

@@ -6,12 +6,12 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 - `main`: milestone 1 merged (scaffold, `si_ready`, CI).
 - PR #2 `feat/touchstone-inspection`: `si_inspect`, IEEE P370 quality via scikit-rf, synthetic examples, labeled quality output. CI green. Awaiting merge.
-- `feat/lumped-extraction` (stacked on PR #2): `python/dsh_si/lumped.py` contract with strict-xfail tests; `.gitignore` for `examples/realdata`; learning log; `CLAUDE.md`.
+- PR #3 `feat/lumped-extraction` (stacked on PR #2): `si_analyze` tool, interpretation validator, report directory (PNG/results.json/HTML), inline images via `ctx.attachments`, `lumped.py` contract with strict-xfail tests, learning log, `CLAUDE.md`, docs budget in CI.
 - Dev profile `~/.dsh/profiles/web` links this checkout; `patchReload: startup` because of inotify exhaustion on this host. Credentials in `~/.dsh/.env`.
 
 ## Next step
 
-Milestone 3 on `feat/lumped-extraction`: `si_analyze` skeleton (interpretation validation, hash check, report dir, `results.json`), `python/dsh_si/report.py` (Matplotlib PNG, HTML, CSV), inline image return through `ctx.attachments.saveImage`, an |S| overview plot for `si_inspect`. Then wire `lumped.py` once the domain owner fills it.
+Merge PR #2 then PR #3. Then: real-model demo of inspect → questions → analyze with inline plot (rebuild + restart first). When `lumped.py` lands: CSV per-frequency export and L/Q/C plots in `analyze.py` (`_summarize_lumped` is the hook), then milestone 4 (`line.py`, `multiport.py`, `se2gmm` pairing).
 
 ## Waiting on the domain owner
 
