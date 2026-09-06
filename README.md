@@ -79,6 +79,8 @@ uv sync --project python --frozen --group dev
 pnpm check          # typecheck, vitest, ruff, pytest
 ```
 
+A profile that links this checkout loads `lib/index.js`, so run `pnpm build` and restart `dsh web` after changing TypeScript; the model only sees tools that exist in the built bundle.
+
 The TypeScript tests mount the plugin on a real DSH tool registry and the real local subprocess provider, with no model or API key. Most use a fake worker (`tests/fixtures/fake-worker.mjs`) to exercise framing, error classification, and cancellation; two tests run the real worker through uv and skip when uv is absent.
 
 ## Quality checks
