@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { isAbsolute } from 'node:path'
 import type { Config } from '../config.ts'
 import { formatComplex, formatHz } from '../format.ts'
+import { imageBlocks, isSavedImage, saveInlineImages } from '../images.ts'
 import type { JsonObject, JsonValue } from '../protocol.ts'
 import { WorkerClient, WorkerError } from '../worker.ts'
 
@@ -22,6 +23,10 @@ export interface InspectValue {
   warnings: string[]
   questions: JsonObject[]
   required_by_device: JsonObject
+  report_dir: string
+  plots: JsonObject[]
+  images: JsonObject[]
+  image_notes: string[]
 }
 
 function obj(value: JsonValue | undefined): JsonObject {
@@ -93,6 +98,8 @@ export function renderInspect(value: InspectValue): string {
   lines.push(`  Method: ${String(value.quality['p370_method'] ?? causality['method'] ?? '')}`)
   lines.push('')
   for (const warning of value.warnings) lines.push(`Warning: ${warning}`)
+  if (value.report_dir !== '') lines.push(`Overview plot: ${value.report_dir}/s_magnitude.png`)
+  for (const note of value.image_notes) lines.push(`Plot note: ${note}`)
   lines.push('')
   lines.push('Before calling si_analyze, ask the user these questions with ask_user_question (pass the array as-is):')
   lines.push(JSON.stringify(value.questions))
@@ -120,9 +127,16 @@ export function registerInspectTool(ctx: Context, worker: WorkerClient, config: 
           warnings: { type: 'array', required: true, items: { type: 'string' } },
           questions: { type: 'array', required: true, items: { type: 'object', additionalProperties: true } },
           required_by_device: { type: 'object', required: true, additionalProperties: true },
+          report_dir: { type: 'string', required: true },
+          plots: { type: 'array', required: true, items: { type: 'object', additionalProperties: true } },
+          images: { type: 'array', required: true, items: { type: 'object', additionalProperties: true } },
+          image_notes: { type: 'array', required: true, items: { type: 'string' } },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: renderInspect(value as InspectValue) }],
+      render: (_args, value) => {
+        const v = value as InspectValue
+        return [{ type: 'text', text: renderInspect(v) }, ...imageBlocks(v.images.filter(isSavedImage))]
+      },
     },
     timeoutMs: config.timeoutMs,
     async execute(args, exec): Promise<InspectValue> {
@@ -131,7 +145,7 @@ export function registerInspectTool(ctx: Context, worker: WorkerClient, config: 
       }
       let result: JsonObject
       try {
-        result = await worker.call('inspect', { path: args.path, tolerances: config.tolerances }, exec.signal)
+        result = await worker.call('inspect', { path: args.path, tolerances: config.tolerances, output_dir: config.outputDir }, exec.signal)
       } catch (error) {
         if (error instanceof WorkerError && DOMAIN_CODES.has(error.code)) {
           throw new Error(`${error.message}${error.detail ? ` (${error.detail})` : ''}`, { cause: error })
@@ -143,6 +157,8 @@ export function registerInspectTool(ctx: Context, worker: WorkerClient, config: 
       }
       const warnings = Array.isArray(result['warnings']) ? result['warnings'].filter((w): w is string => typeof w === 'string') : []
       const questions = Array.isArray(result['questions']) ? result['questions'].map(obj) : []
+      const plots = Array.isArray(result['plots']) ? result['plots'].map(obj) : []
+      const saved = await saveInlineImages(ctx, plots, config.inlinePlots)
       return {
         path: String(result['path'] ?? args.path),
         hash: String(result['hash'] ?? ''),
@@ -151,6 +167,10 @@ export function registerInspectTool(ctx: Context, worker: WorkerClient, config: 
         warnings,
         questions,
         required_by_device: obj(result['required_by_device']),
+        report_dir: typeof result['report_dir'] === 'string' ? result['report_dir'] : '',
+        plots,
+        images: saved.images,
+        image_notes: saved.skipped,
       }
     },
   }))

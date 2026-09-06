@@ -11,7 +11,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import '@deepseek-ai/dsh-tools'
 import '@deepseek-ai/dsh-subprocess'
+import '@deepseek-ai/dsh-attachment'
 import { Config } from './config.ts'
+import { registerAnalyzeTool } from './tools/analyze.ts'
 import { registerInspectTool } from './tools/inspect.ts'
 import { registerReadyTool } from './tools/ready.ts'
 import { WorkerClient } from './worker.ts'
@@ -26,4 +28,5 @@ export function apply(ctx: Context, config: Config): void {
   const worker = new WorkerClient(ctx, config)
   registerReadyTool(ctx, worker, config)
   registerInspectTool(ctx, worker, config)
+  registerAnalyzeTool(ctx, worker, config)
 }
