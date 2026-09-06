@@ -111,3 +111,17 @@ describe.skipIf(!uvAvailable())('si_analyze through uv on the shipped example', 
     expect(textOf(incomplete)).toContain('terminal_mode: expected one of')
   })
 })
+
+describe('inline images through an attachment store', () => {
+  it('returns the plot as an image block and records the attachment id', async () => {
+    const { FakeAttachments } = await import('./fixtures/fake-attachments.ts')
+    const ctx = await mount({ pythonCommand: fakeWorker('analyze') })
+    await ctx.plugin(FakeAttachments)
+    const result = await callTool(ctx, 'si_analyze', { path: '/data/fake.s2p', hash: HASH, interpretation: { device: 'inductor', terminal_mode: 'one_port' } })
+    expect(result.isError).toBe(false)
+    const images = result.content.filter(b => b.type === 'image')
+    expect(images).toHaveLength(1)
+    expect(textOf(result)).toContain('Inline plots: |S| overview of fake.s2p')
+    expect(textOf(result)).not.toContain('Plot note')
+  })
+})
