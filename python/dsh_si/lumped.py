@@ -47,7 +47,7 @@ Q = Im(zdiff) / Re(zdiff)
 
 assumption: parallel RC circuit
 zse = 1 / Y11
-C = 1 / (2 * pi * f * Im(zse) )
+C = -1 / (2 * pi * f * Im(zse) )
 
 assumption: series RC circuit
 C = Im(Y11) / (2 * pi * f)
