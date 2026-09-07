@@ -28,7 +28,11 @@ DEVICE_OPTIONS = [
 REQUIRED_BY_DEVICE: dict[str, list[str]] = {
     "inductor": ["terminal_mode"],
     "capacitor": ["terminal_mode"],
-    "transmission_line": ["ports", "pairs (if differential)", "input_is_mixed_mode"],
+    "transmission_line": [
+        "through_convention (4-port) or ports",
+        "topology (4-port)",
+        "input_is_mixed_mode",
+    ],
     "interposer": ["paths", "pairs (if differential)", "input_is_mixed_mode"],
 }
 
