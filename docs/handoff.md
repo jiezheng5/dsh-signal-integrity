@@ -4,14 +4,15 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 ## State (2026-09-07)
 
-- `main`: milestone 1 merged (scaffold, `si_ready`, CI).
-- `main` also has PR #2 (milestone 2 + milestone 3 pipeline). PR #4 merged into the wrong base 19 s after PR #2 merged, so its commits never reached `main`.
-- PR #5 `feat/lumped-to-main` (against `main`): everything from PR #4 (equations in `lumped.py`, SRF and region labels, `lumped.csv`, per-quantity PNGs, valid-region summary), plus the through mode split into `through_port2_grounded` = 1/Y11 (V2 = 0) and `through_port2_open` = Z11 (I2 = 0), both exact, plus resume/deployment docs. Merge this one; do not stack on it.
-- Dev profile `~/.dsh/profiles/web` links this checkout; `patchReload: startup` because of inotify exhaustion on this host. Credentials in `~/.dsh/.env`.
+- `main`: milestones 1 to 3 merged (PR #5 landed the lumped equations, through-mode split, CSV, per-quantity PNGs).
+- Branch `feat/report-link` (PR #6): `si_analyze` returns `report_url` and the plugin serves `outputDir` under `/si-reports` on the DSH web server (`ctx.inject(['connection','webServer'])`, cookie auth via `requestRejection`, realpath containment, extension allowlist). Also `scripts/dev-restart.sh` and a rewritten `docs/deployment.md`.
+- Dev profile `~/.dsh/profiles/web` links this checkout; `patchReload: startup` because of inotify exhaustion on this host. Credentials in `~/.dsh/.env`. Cold boot 3 to 4 minutes; the socket answers 404 while composing.
+- Milestone 4 scope agreed: first PR is `line.py` only (2-port single-ended and 4-port differential IL, RL, Z_c); interposer multiport is a second PR.
 
 ## Next step
 
-Rebuild + restart, then a real-model demo: inspect → questions → analyze on `examples/synthetic` inductor/capacitor files with the inline L or C plot; capture for README. Then milestone 4: `line.py` (IL, RL, `Z_c = sqrt(B/C)` with the user's `select_zc_branch`; their docstring also gives `Z_c = Z_ref * sqrt(((1+S11)^2 - S12 S21)/((1-S11)^2 - S12 S21))`), `multiport.py`, `se2gmm` pairing.
+1. Real-model demo in the browser (Claude-in-Chrome was not connected): inspect → questions → analyze `examples/synthetic/series_rl_10nH.s1p`; confirm the final answer carries the `http://127.0.0.1:3080/si-reports/...` link and the tool card shows the inline plot; capture for README.
+2. Milestone 4 brainstorm, remaining questions: Z_c branch selection contract (`select_zc_branch` is the domain owner's), which port-mapping question `si_inspect` asks for 4-port (odd/even vs i, i+n/2 pairing), and whether IL/RL for differential use `Sdd21`/`Sdd11` only.
 
 ## Waiting on the domain owner
 
@@ -20,9 +21,8 @@ Rebuild + restart, then a real-model demo: inspect → questions → analyze on 
 
 ## Gotchas carried forward
 
-See `docs/learning-log.html` page 7. Top three: rebuild + restart before demos; `pkill -f 'bin\.ts web --port 309[9]'`; shell `cd` persists between tool calls.
+See `docs/learning-log.html` page 7 and `docs/deployment.md`. Top three: rebuild + restart before demos (`scripts/dev-restart.sh`); never print `~/.dsh/dsh-web.log` (token URL); shell `cd` persists between tool calls.
 
-## Future Planning
-maybe for snp, n > 2 ports, asking user whether it should be modified as single-ended or differential paris, if yes, through topology, industry common practice are either:
-- odd to even, e.g. s8p: 1 - 2, 3 - 4, 5 - 6, 7 - 8, ...
-- i to i + n / 2, e.g.s8p: 1 - 5, 2 - 6, 3 - 7, 4 - 8, ... 
+## Future planning
+
+For n > 2 ports, ask whether to treat ports as single-ended or differential pairs; common through topologies: odd to even (1-2, 3-4, ...) or i to i + n/2 (1-5, 2-6, ... for s8p).
