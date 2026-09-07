@@ -2,17 +2,59 @@
 
 This module is the domain owner's: the equations below are the ones the
 report will carry, so they are written and reviewed by an RF engineer rather
-than generated. Each function documents its contract; the accompanying tests
-in tests/test_lumped.py are marked strict-xfail until implemented, so CI stays
-green now and fails the moment an implementation lands without the marker
-being removed.
+than generated. tests/test_lumped.py checks every function against closed-form
+fixtures. Sign convention: a series capacitor has Im(Z) < 0, so C = -1/(omega*Im(Z));
+the sign is folded into the formulas below and any point with the wrong sign
+becomes NaN rather than a negative component value.
 
-Conventions (from docs/plans/dsh-signal-integrity-plan.md):
-    L = Im(Z) / omega            series inductance
-    Q = Im(Z) / Re(Z)            quality factor
-    C = -1 / (omega * Im(Z))     series capacitance
-    Z_2T = Z11 + Z22 - Z12 - Z21 two-terminal differential impedance of a 2-port
-Positive omega = 2*pi*f; a DC point (f = 0) must be skipped, never divided by.
+
+## T and Pi Circuits for Extracting R, L, C from s2p.
+T-circuit:
+
+Port 1 --[ Z11 - Z12 ]--+--[ Z22 - Z12 ]-- Port 2
+                        |
+                      [ Z12 ]
+                        |
+Ground ----------------+------------------- Ground
+
+Pi-circuit:
+
+Port 1 ------------[ -Y12 ]------------ Port 2
+        |                               |
+   [ Y11 + Y12 ]                   [ Y22 + Y21 ]
+        |                               |
+Ground -+-------------------------------+- Ground
+
+## Common Equation to extract R, L, C from s2p
+S, Y, Z, ABCD matrix all have ready to use libraries to convert between each other. The following equations are based on the assumption that the s2p file is a 2-port network.
+
+```json
+assumption: microstrip or stripline
+z_ref = 50
+nominator = (1 + S11) * (1 + S11) - S12 * S21
+denominator = (1 - S11) * (1 - S11) - S12 * S21
+zc = z_ref * sqrt(nominator / denominator)
+
+assumption: series RL circuit
+zse = 1 / Y11
+L = 1 / (2 * pi * f) * Im(zse)
+Q = Im(zse) / Re(zse)
+
+assumption: differential inductor
+zdiff = z11 - z12 - z21 + z22
+L = Im(zdiff) / (2 * pi * f)
+Q = Im(zdiff) / Re(zdiff)
+
+assumption: parallel RC circuit
+zse = 1 / Y11
+C = 1 / (2 * pi * f * Im(zse) )
+
+assumption: series RC circuit
+C = Im(Y11) / (2 * pi * f)
+```
+
+
+
 """
 
 from __future__ import annotations
@@ -22,48 +64,90 @@ from typing import Any, Literal
 import numpy as np
 
 TerminalMode = Literal["one_port", "two_terminal_differential", "through"]
+Region = Literal["valid", "near_srf", "beyond_srf", "wrong_sign", "dc"]
+
+# A point counts as "near" self-resonance when it lies within this fraction of f_srf.
+NEAR_SRF_FRACTION = 0.1
 
 
 def impedance_from_network(network: Any, terminal_mode: TerminalMode) -> np.ndarray:
     """Complex impedance Z(f) of the element under the chosen terminal interpretation.
 
-    TODO(brittany): implement.
-      one_port                  -> Z = network.z[:, 0, 0] (port 1 to ground)
-      two_terminal_differential -> Z = Z11 + Z22 - Z12 - Z21 (element floating between ports)
-      through                   -> series element in a through fixture; decide whether to
-                                   support it here or defer to fixture de-embedding.
-    Returns a complex array with one value per frequency point.
+    one_port                  Z11: element from port 1 to ground.
+    two_terminal_differential Z11 + Z22 - Z12 - Z21: element floating between the ports
+                              (the two series arms of the T-circuit; a shunt leg cancels).
+    through                   1/Y11: series element in a through fixture, port 2 shorted by
+                              the definition of Y11 (the Pi-circuit's series arm plus its
+                              port-1 shunt leg; ideal fixture assumed, no de-embedding).
     """
-    raise NotImplementedError("impedance_from_network: equations pending")
+    if terminal_mode == "one_port":
+        return np.asarray(network.z[:, 0, 0], dtype=complex)
+    if terminal_mode == "two_terminal_differential":
+        z = np.asarray(network.z, dtype=complex)
+        return z[:, 0, 0] + z[:, 1, 1] - z[:, 0, 1] - z[:, 1, 0]
+    if terminal_mode == "through":
+        return 1.0 / np.asarray(network.y[:, 0, 0], dtype=complex)
+    raise ValueError(f"unknown terminal_mode {terminal_mode!r}")
+
+
+def _omega(freq_hz: np.ndarray) -> np.ndarray:
+    """2*pi*f with NaN at f <= 0 so that dividing by it never raises and marks DC as undefined."""
+    f = np.asarray(freq_hz, dtype=float)
+    return np.where(f > 0, 2.0 * np.pi * f, np.nan)
 
 
 def inductor_lq(z: np.ndarray, freq_hz: np.ndarray) -> dict[str, np.ndarray]:
     """Series inductance, quality factor, and series resistance versus frequency.
 
-    TODO(brittany): implement.
-    Returns {"L_h": ..., "Q": ..., "R_ohm": ...}, each a float array aligned with
-    freq_hz. Use NaN where the quantity is undefined (e.g. f = 0, Re(Z) = 0).
+    L = Im(Z)/omega, Q = Im(Z)/Re(Z), R = Re(Z). L and Q are NaN at DC and Q is NaN
+    where Re(Z) = 0 (an ideal lossless element has no finite Q).
     """
-    raise NotImplementedError("inductor_lq: equations pending")
+    z = np.asarray(z, dtype=complex)
+    omega = _omega(freq_hz)
+    re, im = z.real, z.imag
+    with np.errstate(divide="ignore", invalid="ignore"):
+        l_h = im / omega
+        q = np.where(re != 0, im / np.where(re != 0, re, np.nan), np.nan)
+        q = np.where(np.isnan(omega), np.nan, q)
+    return {"L_h": l_h, "Q": q, "R_ohm": re.copy()}
 
 
 def capacitor_c(z: np.ndarray, freq_hz: np.ndarray) -> dict[str, np.ndarray]:
     """Series capacitance and ESR versus frequency.
 
-    TODO(brittany): implement.
-    Returns {"C_f": ..., "ESR_ohm": ...}. Use NaN where Im(Z) >= 0 (inductive)
-    or f = 0 rather than reporting a negative capacitance.
+    C = -1/(omega*Im(Z)) where the reactance is capacitive (Im(Z) < 0); NaN at DC or
+    where the reactance is inductive, never a negative capacitance. ESR = Re(Z).
     """
-    raise NotImplementedError("capacitor_c: equations pending")
+    z = np.asarray(z, dtype=complex)
+    omega = _omega(freq_hz)
+    im = z.imag
+    capacitive = im < 0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        c_f = np.where(capacitive, -1.0 / (omega * np.where(capacitive, im, np.nan)), np.nan)
+    return {"C_f": c_f, "ESR_ohm": z.real.copy()}
 
 
 def self_resonance_hz(z: np.ndarray, freq_hz: np.ndarray) -> float | None:
-    """First frequency where Im(Z) changes sign (series self-resonance), or None.
+    """First frequency above DC where Im(Z) changes sign, linearly interpolated, or None.
 
-    TODO(brittany): implement (linear interpolation between the bracketing
-    points is enough; decide how to treat multiple crossings).
+    Only the first crossing is returned: it bounds the region where a single-element
+    model holds. Later crossings are visible in classify_region as beyond_srf.
     """
-    raise NotImplementedError("self_resonance_hz: pending")
+    f = np.asarray(freq_hz, dtype=float)
+    im = np.asarray(z, dtype=complex).imag
+    keep = f > 0
+    f, im = f[keep], im[keep]
+    if f.size < 2:
+        return None
+    sign = np.sign(im)
+    for k in range(f.size - 1):
+        if sign[k] == 0:
+            return float(f[k])
+        if sign[k] * sign[k + 1] < 0:
+            # linear interpolation of the zero between the bracketing points
+            frac = im[k] / (im[k] - im[k + 1])
+            return float(f[k] + frac * (f[k + 1] - f[k]))
+    return None
 
 
 def classify_region(
@@ -71,12 +155,27 @@ def classify_region(
 ) -> list[str]:
     """Label each frequency point so plots and reports can mark where extraction is meaningful.
 
-    TODO(brittany): decide the labels and their rules. Suggested vocabulary:
-      "valid"              extraction physically meaningful
-      "near_srf"           within some band of the self-resonance
-      "beyond_srf"         above self-resonance, sign of reactance flipped
-      "wrong_sign"         reactance has the wrong sign for the device at this point
-      "dc"                 f = 0, skipped
-    Returns one label per frequency point.
+    dc          f <= 0, no reactance to extract
+    beyond_srf  above the first self-resonance: the single-element model no longer holds
+    near_srf    within NEAR_SRF_FRACTION of the self-resonance, values are steep and unreliable
+    wrong_sign  reactance has the wrong sign for the device (inductor expects Im(Z) > 0,
+                capacitor Im(Z) < 0)
+    valid       everything else
     """
-    raise NotImplementedError("classify_region: policy pending")
+    f = np.asarray(freq_hz, dtype=float)
+    im = np.asarray(z, dtype=complex).imag
+    expected_positive = device == "inductor"
+    srf = self_resonance_hz(z, freq_hz)
+    labels: list[str] = []
+    for fk, imk in zip(f, im, strict=True):
+        if fk <= 0:
+            labels.append("dc")
+        elif srf is not None and abs(fk - srf) <= NEAR_SRF_FRACTION * srf:
+            labels.append("near_srf")
+        elif srf is not None and fk > srf:
+            labels.append("beyond_srf")
+        elif (imk > 0) != expected_positive:
+            labels.append("wrong_sign")
+        else:
+            labels.append("valid")
+    return labels
