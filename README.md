@@ -89,13 +89,16 @@ Every `si_analyze` call leaves a directory under `outputDir` (default `~/.dsh/si
 
 ## Lumped-element extraction
 
-Terminal interpretation is asked, never guessed, because the same 2-port file can mean three circuits:
+Terminal interpretation is asked, never guessed, because the same 2-port file can mean several circuits:
 
 | `terminal_mode` | Impedance used | Circuit |
 |---|---|---|
 | `one_port` | Z11 | element from port 1 to ground |
 | `two_terminal_differential` | Z11 + Z22 − Z12 − Z21 | element floating between the ports (series arms of the T-circuit) |
-| `through` | 1 / Y11 | series element in a through fixture (Pi-circuit series arm, ideal fixture) |
+| `through_port2_grounded` | 1 / Y11 | element in a through fixture, port 2 grounded in use (Pi-circuit series arm with the port-1 shunt leg) |
+| `through_port2_open` | 1 / (Y11 + Y12) | element in a through fixture, port 2 open in use (Pi-circuit port-1 shunt leg; the through arm is fixture) |
+
+`−1/Y12` (series arm alone) is not offered: it ignores port-to-ground coupling at both ends.
 
 From Z(f): L = Im(Z)/ω, Q = Im(Z)/Re(Z), R = Re(Z) for inductors; C = −1/(ω·Im(Z)), ESR = Re(Z) for capacitors. The first sign change of Im(Z) is the self-resonance (linearly interpolated). Every point is labeled `valid`, `near_srf` (within 10 % of the SRF), `beyond_srf`, `wrong_sign`, or `dc`; headline numbers (median, min, max) use valid points only, plots shade the rest, and the CSV carries every point with its label. A wrong-sign point becomes NaN, never a negative component value.
 

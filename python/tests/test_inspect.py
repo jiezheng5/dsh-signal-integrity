@@ -170,3 +170,16 @@ def test_sigma_max_matches_direct_norm():
     p = quality.passivity_detail(ntwk, 1e-9)
     direct = max(np.linalg.norm(ntwk.s[i], 2) for i in range(11))
     assert p["sigma_max_worst"] == pytest.approx(direct)
+
+
+def test_two_port_offers_both_through_modes(tmp_path: Path):
+    path = fixtures.write(fixtures.lossy_line(freq=fixtures.frequency(npoints=51)), tmp_path, "l")
+    result = run({"path": str(path)})
+    question = next(q for q in result["questions"] if q["id"] == "terminal_mode")
+    labels = [o["label"] for o in question["options"]]
+    assert "through_port2_grounded" in labels and "through_port2_open" in labels
+    assert "through" not in labels
+    # every option matches a mode the validator accepts
+    from dsh_si.interpretation import LUMPED_MODES
+
+    assert set(labels) <= set(LUMPED_MODES)

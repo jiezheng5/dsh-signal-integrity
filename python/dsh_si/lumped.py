@@ -63,7 +63,9 @@ from typing import Any, Literal
 
 import numpy as np
 
-TerminalMode = Literal["one_port", "two_terminal_differential", "through"]
+TerminalMode = Literal[
+    "one_port", "two_terminal_differential", "through_port2_grounded", "through_port2_open"
+]
 Region = Literal["valid", "near_srf", "beyond_srf", "wrong_sign", "dc"]
 
 # A point counts as "near" self-resonance when it lies within this fraction of f_srf.
@@ -76,17 +78,25 @@ def impedance_from_network(network: Any, terminal_mode: TerminalMode) -> np.ndar
     one_port                  Z11: element from port 1 to ground.
     two_terminal_differential Z11 + Z22 - Z12 - Z21: element floating between the ports
                               (the two series arms of the T-circuit; a shunt leg cancels).
-    through                   1/Y11: series element in a through fixture, port 2 shorted by
-                              the definition of Y11 (the Pi-circuit's series arm plus its
-                              port-1 shunt leg; ideal fixture assumed, no de-embedding).
+    through_port2_grounded    1/Y11: element in a through fixture with port 2 grounded in use.
+                              In the Pi-circuit this is the series arm in parallel with the
+                              port-1 shunt leg; the port-2 leg is shorted out.
+    through_port2_open        1/(Y11 + Y12): element in a through fixture with port 2 open in
+                              use. In the Pi-circuit Y11 + Y12 = Yp1, the port-1 shunt leg
+                              alone, so the through arm is treated as fixture, not device.
+    -1/Y12 (the series arm alone) is deliberately not offered: it drops both shunt legs,
+    which is only right when port-to-ground coupling is negligible.
     """
     if terminal_mode == "one_port":
         return np.asarray(network.z[:, 0, 0], dtype=complex)
     if terminal_mode == "two_terminal_differential":
         z = np.asarray(network.z, dtype=complex)
         return z[:, 0, 0] + z[:, 1, 1] - z[:, 0, 1] - z[:, 1, 0]
-    if terminal_mode == "through":
+    if terminal_mode == "through_port2_grounded":
         return 1.0 / np.asarray(network.y[:, 0, 0], dtype=complex)
+    if terminal_mode == "through_port2_open":
+        y = np.asarray(network.y, dtype=complex)
+        return 1.0 / (y[:, 0, 0] + y[:, 0, 1])
     raise ValueError(f"unknown terminal_mode {terminal_mode!r}")
 
 

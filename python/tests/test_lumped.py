@@ -70,15 +70,44 @@ def test_classify_region_marks_beyond_srf():
     assert "beyond_srf" in labels or "wrong_sign" in labels
 
 
-def test_through_mode_uses_one_over_y11_for_series_element():
-    f = fixtures.frequency(0.1, 5.0, 20)
+def _pi_circuit(f, y_series, y_shunt1, y_shunt2):
+    """2-port from Pi-circuit legs: Y11 = Yp1 + Ys, Y22 = Yp2 + Ys, Y12 = Y21 = -Ys."""
     import skrf as rf
 
-    # Series R+L between port 1 and port 2 in a through fixture: 1/Y11 is the element (port 2 shorted).
-    media = rf.media.DefinedGammaZ0(f, z0=50)
-    two_port = media.resistor(1.0) ** media.inductor(10e-9)
-    z = lumped.impedance_from_network(two_port, "through")
-    assert z == pytest.approx(1.0 + 1j * f.w * 10e-9, rel=1e-6)
+    ymat = np.empty((f.npoints, 2, 2), dtype=complex)
+    ymat[:, 0, 0] = y_shunt1 + y_series
+    ymat[:, 1, 1] = y_shunt2 + y_series
+    ymat[:, 0, 1] = ymat[:, 1, 0] = -y_series
+    return rf.Network(frequency=f, y=ymat, z0=50.0)
+
+
+def test_through_port2_grounded_is_one_over_y11():
+    f = fixtures.frequency(0.1, 5.0, 20)
+    y_series = 1 / (1.0 + 1j * f.w * 10e-9)
+    y_shunt1 = 1j * f.w * 0.3e-12
+    y_shunt2 = 1j * f.w * 0.7e-12
+    two_port = _pi_circuit(f, y_series, y_shunt1, y_shunt2)
+    z = lumped.impedance_from_network(two_port, "through_port2_grounded")
+    # port 2 shorted: series arm in parallel with the port-1 shunt leg; port-2 leg shorted out
+    assert z == pytest.approx(1 / (y_shunt1 + y_series), rel=1e-6)
+
+
+def test_through_port2_open_is_one_over_y11_plus_y12():
+    f = fixtures.frequency(0.1, 5.0, 20)
+    y_series = 1 / (1.0 + 1j * f.w * 10e-9)
+    y_shunt1 = 1j * f.w * 0.3e-12
+    y_shunt2 = 1j * f.w * 0.7e-12
+    two_port = _pi_circuit(f, y_series, y_shunt1, y_shunt2)
+    z = lumped.impedance_from_network(two_port, "through_port2_open")
+    # Y11 + Y12 = Yp1: the port-1 shunt leg alone
+    assert z == pytest.approx(1 / y_shunt1, rel=1e-6)
+
+
+def test_unknown_terminal_mode_raises():
+    f = fixtures.frequency(0.1, 5.0, 3)
+    ntwk = fixtures.series_rl_oneport(freq=f)
+    with pytest.raises(ValueError):
+        lumped.impedance_from_network(ntwk, "through")
 
 
 def test_inductor_reports_nan_at_dc():
