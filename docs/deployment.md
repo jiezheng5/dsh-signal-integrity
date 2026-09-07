@@ -35,7 +35,7 @@ What it does, and why each step exists:
 
 1. `pnpm build` here. The model only sees `lib/index.js`; an unbuilt `src/` change makes it improvise around missing tools.
 2. Stop every `dsh web` started from the source checkout (pattern `apps/cli/src/bin.ts web`, any port). The profile loads plugins at startup, so a running server keeps the old bundle.
-3. Start `pnpm dsh web` from the harness checkout, detached, log at `~/.dsh/dsh-web.log` (mode 600 because the log contains the token URL). Waits until the port answers.
+3. Start `pnpm dsh web` from the harness checkout, detached, log at `~/.dsh/dsh-web.log` (mode 600 because the log contains the token URL). Waits until the routes answer; a cold tsx boot takes 3 to 4 minutes on this host, and the socket answers 404 before the tree has composed.
 
 ## Verify
 

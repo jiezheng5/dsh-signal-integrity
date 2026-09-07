@@ -70,19 +70,21 @@ nohup pnpm dsh web "${passthrough[@]}" >>"$LOG" 2>&1 &
 pid=$!
 
 # Ready when the port answers anything at all (401 without the token is fine).
-# A cold tsx boot of the harness checkout takes well over a minute on this host.
-for _ in $(seq 1 600); do
+# A cold tsx boot of the harness checkout takes 3 to 4 minutes on this host.
+for _ in $(seq 1 1500); do
   if ! kill -0 "$pid" 2>/dev/null; then
     echo "dsh web exited early; last log lines:" >&2
     tail -n 20 "$LOG" >&2
     exit 1
   fi
-  if curl -s -o /dev/null "http://127.0.0.1:$port/"; then
+  # 404 = socket open, tree still composing; anything else = routes are live.
+  code=$(curl -s --max-time 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/" || true)
+  if [ -n "$code" ] && [ "$code" != "000" ] && [ "$code" != "404" ]; then
     echo "dsh web up on port $port (pid $pid); log: $LOG"
     echo "the browser opens with the token URL unless --no-open was given; the URL is in the log, do not paste it into chat"
     exit 0
   fi
   sleep 0.3
 done
-echo "dsh web did not answer on port $port within 180 s; see $LOG" >&2
+echo "dsh web did not answer on port $port within 450 s; see $LOG" >&2
 exit 1
