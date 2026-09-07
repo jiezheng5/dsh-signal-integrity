@@ -92,15 +92,19 @@ def test_through_port2_grounded_is_one_over_y11():
     assert z == pytest.approx(1 / (y_shunt1 + y_series), rel=1e-6)
 
 
-def test_through_port2_open_is_one_over_y11_plus_y12():
+def test_through_port2_open_is_z11_not_the_shunt_leg():
     f = fixtures.frequency(0.1, 5.0, 20)
     y_series = 1 / (1.0 + 1j * f.w * 10e-9)
     y_shunt1 = 1j * f.w * 0.3e-12
     y_shunt2 = 1j * f.w * 0.7e-12
     two_port = _pi_circuit(f, y_series, y_shunt1, y_shunt2)
     z = lumped.impedance_from_network(two_port, "through_port2_open")
-    # Y11 + Y12 = Yp1: the port-1 shunt leg alone
-    assert z == pytest.approx(1 / y_shunt1, rel=1e-6)
+    # I2 = 0: series arm runs into the port-2 shunt leg, that path in parallel with the port-1 leg
+    y_in = y_shunt1 + y_series * y_shunt2 / (y_series + y_shunt2)
+    assert z == pytest.approx(1 / y_in, rel=1e-6)
+    assert z == pytest.approx(two_port.z[:, 0, 0], rel=1e-6)
+    # 1/(Y11+Y12) is the port-1 shunt leg alone; it must not be what this mode returns
+    assert not np.allclose(z, 1 / y_shunt1, rtol=1e-3)
 
 
 def test_unknown_terminal_mode_raises():

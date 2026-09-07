@@ -19,7 +19,7 @@ Ground ----------------+------------------- Ground
 
 Pi-circuit:
 
-Port 1 ------------[ -Y12 ]------------ Port 2
+Port 1 ------------[ -Y12 ]------------------ Port 2
         |                               |
    [ Y11 + Y12 ]                   [ Y22 + Y21 ]
         |                               |
@@ -81,11 +81,15 @@ def impedance_from_network(network: Any, terminal_mode: TerminalMode) -> np.ndar
     through_port2_grounded    1/Y11: element in a through fixture with port 2 grounded in use.
                               In the Pi-circuit this is the series arm in parallel with the
                               port-1 shunt leg; the port-2 leg is shorted out.
-    through_port2_open        1/(Y11 + Y12): element in a through fixture with port 2 open in
-                              use. In the Pi-circuit Y11 + Y12 = Yp1, the port-1 shunt leg
-                              alone, so the through arm is treated as fixture, not device.
-    -1/Y12 (the series arm alone) is deliberately not offered: it drops both shunt legs,
-    which is only right when port-to-ground coupling is negligible.
+    through_port2_open        Z11: element in a through fixture with port 2 open in use.
+                              Exact by definition (I2 = 0). In the T-circuit it is the port-1
+                              arm plus the shunt leg; in the Pi-circuit the series arm runs
+                              into the port-2 shunt leg and that path sits in parallel with
+                              the port-1 leg, which again reduces to Z11 = Y22/det(Y).
+    Both through modes are exact for any 2-port: V2 = 0 is the definition of Y11, I2 = 0
+    the definition of Z11. 1/(Y11 + Y12) (the Pi port-1 shunt leg alone) and -1/Y12 (the
+    series arm alone) are deliberately not offered: each drops a branch and equals the
+    open- or short-circuit input only when the dropped port-to-ground coupling is zero.
     """
     if terminal_mode == "one_port":
         return np.asarray(network.z[:, 0, 0], dtype=complex)
@@ -95,8 +99,7 @@ def impedance_from_network(network: Any, terminal_mode: TerminalMode) -> np.ndar
     if terminal_mode == "through_port2_grounded":
         return 1.0 / np.asarray(network.y[:, 0, 0], dtype=complex)
     if terminal_mode == "through_port2_open":
-        y = np.asarray(network.y, dtype=complex)
-        return 1.0 / (y[:, 0, 0] + y[:, 0, 1])
+        return np.asarray(network.z[:, 0, 0], dtype=complex)
     raise ValueError(f"unknown terminal_mode {terminal_mode!r}")
 
 

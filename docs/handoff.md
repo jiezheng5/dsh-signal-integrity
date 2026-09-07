@@ -6,7 +6,7 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 - `main`: milestone 1 merged (scaffold, `si_ready`, CI).
 - `main` also has PR #2 (milestone 2 + milestone 3 pipeline). PR #4 merged into the wrong base 19 s after PR #2 merged, so its commits never reached `main`.
-- PR #5 `feat/lumped-to-main` (against `main`): everything from PR #4 (equations in `lumped.py`, SRF and region labels, `lumped.csv`, per-quantity PNGs, valid-region summary), plus the through mode split into `through_port2_grounded` = 1/Y11 and `through_port2_open` = 1/(Y11+Y12), plus resume/deployment docs. Merge this one; do not stack on it.
+- PR #5 `feat/lumped-to-main` (against `main`): everything from PR #4 (equations in `lumped.py`, SRF and region labels, `lumped.csv`, per-quantity PNGs, valid-region summary), plus the through mode split into `through_port2_grounded` = 1/Y11 (V2 = 0) and `through_port2_open` = Z11 (I2 = 0), both exact, plus resume/deployment docs. Merge this one; do not stack on it.
 - Dev profile `~/.dsh/profiles/web` links this checkout; `patchReload: startup` because of inotify exhaustion on this host. Credentials in `~/.dsh/.env`.
 
 ## Next step
@@ -15,7 +15,6 @@ Merge PR #5. Rebuild + restart, then a real-model demo: inspect â†’ questions â†
 
 ## Waiting on the domain owner
 
-- `through_port2_open` = 1/(Y11+Y12) is the port-1 shunt leg of the Pi-circuit, not Z11 with port 2 open; implemented as specified, worth a second look at the option wording in `inspect.py`.
 - Interpretation of `examples/realdata/QSFPDD IL_NR1.S4P` (non-reciprocal at every point: partial export?).
 - Which `examples/realdata` files, if any, are cleared for redistribution.
 
