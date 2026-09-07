@@ -80,7 +80,7 @@ function uvAvailable(): boolean {
 }
 
 describe.skipIf(!uvAvailable())('si_analyze through uv on the shipped example', () => {
-  it('inspects, then analyzes the line as overview_only with a real report directory', async () => {
+  it('inspects, then analyzes the line as complete with a real report directory', async () => {
     const ctx = await mount()
     const inspected = textOf(await callTool(ctx, 'si_inspect', { path: EXAMPLE_LINE }))
     const hash = /Pass hash ([0-9a-f]{64}) to si_analyze/u.exec(inspected)?.[1]
@@ -92,11 +92,13 @@ describe.skipIf(!uvAvailable())('si_analyze through uv on the shipped example', 
     })
     expect(result.isError).toBe(false)
     const text = textOf(result)
-    expect(text).toContain('as transmission_line: status overview_only')
-    expect(text).toContain('Warning: transmission_line analysis arrives in milestone 4')
+    expect(text).toContain('as transmission_line: status complete')
+    expect(text).toContain('  se: Zc median 50')
     const dir = /Report directory: (.+)/u.exec(text)?.[1]
     expect(dir).toBeDefined()
-    for (const name of ['s_magnitude.png', 'results.json', 'report.html']) expect(existsSync(join(dir!, name))).toBe(true)
+    for (const name of ['s_magnitude.png', 'line.csv', 'characteristic_impedance.png', 'results.json', 'report.html']) {
+      expect(existsSync(join(dir!, name))).toBe(true)
+    }
   })
 
   it('refuses a wrong hash and an incomplete interpretation with actionable text', async () => {
