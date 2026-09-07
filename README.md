@@ -6,7 +6,7 @@ Turns Touchstone S-parameter files into agent-guided signal-integrity reports: t
 
 ## Status
 
-Milestone 1 of 5 (plugin scaffold). The `si_ready` tool loads into DSH and probes the Python worker. Inspection, lumped-element extraction, and interconnect analysis follow in later pull requests; see [the plan](docs/plans/dsh-signal-integrity-plan.md).
+Milestone 3 of 5 (analysis pipeline and reports). `si_ready` probes the Python worker; `si_inspect` parses, hashes, and quality-screens a file, returns an |S| overview plot, and hands the agent the questions it must ask; `si_analyze` validates the answers, refuses a changed file, and writes a report directory (PNG, results.json, HTML). The lumped-element equations (`python/dsh_si/lumped.py`) and interconnect analyses are still pending, so `si_analyze` currently reports `status: overview_only`. See [the plan](docs/plans/dsh-signal-integrity-plan.md) and the [learning log](docs/learning-log.html).
 
 ## How it works
 
@@ -24,8 +24,8 @@ Tools (model-facing):
 | Tool | Purpose |
 |---|---|
 | `si_ready` | Probe uv, the Python interpreter, and the scientific packages; explain any missing piece with the exact remedy. |
-| `si_inspect` | *(milestone 2)* Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and list the interpretation questions the agent must ask. |
-| `si_analyze` | *(milestones 3–4)* Run the device-specific extraction once the interpretation is complete, and write the report. |
+| `si_inspect` | Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and return the interpretation questions (shaped for `ask_user_question`) the agent must ask. |
+| `si_analyze` | Validate the interpretation (device, terminal mode, ports, pairs, paths), refuse a changed file by hash, run the device analysis that exists, and write `<outputDir>/analyze/<file>-<hash8>-<stamp>/` with `s_magnitude.png`, `results.json`, `report.html`. Returns a bounded summary and the key plot inline. |
 
 ## Install
 
@@ -41,7 +41,18 @@ npx @deepseek-ai/dsh --profile web --dump-config   # shows the signal-integrity 
 npx @deepseek-ai/dsh web
 ```
 
-Then ask the agent to call `si_ready`. The first call runs `uv sync` for the worker, which takes a minute.
+Then ask the agent to call `si_ready`. The first call runs `uv sync` for the worker, which takes a minute. Next, point it at a file: "Inspect `<repo>/examples/synthetic/lossy_line_20mm.s2p`". The [synthetic examples](examples/synthetic/README.md) list the expected result for each file.
+
+### Model credentials
+
+DSH reads provider keys from the launch environment or from `$DSH_HOME/.env` (default `~/.dsh/.env`). Keep keys out of shell history and chat:
+
+```sh
+umask 077
+printf 'DEEPSEEK_API_KEY=%s\n' "$YOUR_KEY_VARIABLE" > ~/.dsh/.env
+```
+
+The URL `dsh web` prints carries a per-launch browser-trust token. Treat it like a password: do not paste it into issues, chats, or documentation. It is bound to 127.0.0.1 and rotates on every restart.
 
 Release tarball and GitHub installs are documented with the `v0.1.0` release.
 
@@ -68,7 +79,25 @@ uv sync --project python --frozen --group dev
 pnpm check          # typecheck, vitest, ruff, pytest
 ```
 
+A profile that links this checkout loads `lib/index.js`, so run `pnpm build` and restart `dsh web` after changing TypeScript; the model only sees tools that exist in the built bundle.
+
 The TypeScript tests mount the plugin on a real DSH tool registry and the real local subprocess provider, with no model or API key. Most use a fake worker (`tests/fixtures/fake-worker.mjs`) to exercise framing, error classification, and cancellation; two tests run the real worker through uv and skip when uv is absent.
+
+## Reports and plots
+
+Every `si_analyze` call leaves a directory under `outputDir` (default `~/.dsh/si-reports/analyze/`): the |S| overview PNG, `results.json` (input hash, library versions, settings, quality, warnings, summary), and a self-contained `report.html`. `si_inspect` writes the same overview under `inspect/`. When DSH's attachment service is mounted (it is in the web profile) the plot also comes back inline in the chat as an image; otherwise the path is reported. Plots follow one rule set: one axis, fixed eight-color order (reflections first, then the strongest transmissions), units on every axis, assumptions in the subtitle.
+
+## Quality checks
+
+Two layers are reported together. The IEEE P370 metrics come from scikit-rf's `IEEEP370_FD_QM`, the only open-source Python implementation of the standard's frequency-domain quality checks, and carry the standard's evaluation bands (good, acceptable, inconclusive, poor). The exact per-frequency checks are computed by this plugin and say *where* a problem is.
+
+| Check | IEEE P370 metric (verdict) | Exact detail (location) |
+|---|---|---|
+| Passivity | PQMi score and band | largest singular value of S per frequency vs `1 + tolerances.passivity`; worst point, violating count |
+| Reciprocity | RQMi score and band | max \|Sij − Sji\| per frequency vs `tolerances.reciprocity`; worst point, violating count |
+| Causality | CQMi score and band (screening, not a proof) | none: causality has no exact per-frequency form on sampled data |
+
+One-ports get the exact passivity check only; the P370 metrics need off-diagonal terms. References: [scikit-rf IEEE P370 example](https://scikit-rf.readthedocs.io/en/latest/examples/networktheory/IEEEP370%20Deembedding.html), [MATLAB `ieee370QualityCheckFrequencyDomain`](https://www.mathworks.com/help/rf/ref/ieee370qualitycheckfrequencydomain.html) for the reference implementation's behavior.
 
 ## Assumptions and limits
 

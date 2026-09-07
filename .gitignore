@@ -13,3 +13,7 @@ __pycache__/
 .claude/
 .DS_Store
 *.tgz
+.playwright-mcp/
+
+# Local measurement data: too large for git and not cleared for redistribution.
+examples/realdata/

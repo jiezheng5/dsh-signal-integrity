@@ -33,6 +33,11 @@ jobs:
       - name: Sync Python worker environment
         run: uv sync --project python --frozen --group dev
 
+      - name: Docs budget (CLAUDE.md <= 80 lines, docs/handoff.md <= 60 lines)
+        run: |
+          test "$(wc -l < CLAUDE.md)" -le 80 || { echo "CLAUDE.md over budget: trim, do not append"; exit 1; }
+          test "$(wc -l < docs/handoff.md)" -le 60 || { echo "docs/handoff.md over budget: overwrite, do not append"; exit 1; }
+
       - name: Typecheck
         run: pnpm typecheck
 
