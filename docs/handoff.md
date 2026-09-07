@@ -19,7 +19,6 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 - Interpretation of `examples/realdata/QSFPDD IL_NR1.S4P` (non-reciprocal at every point: partial export?).
 - Which `examples/realdata` files, if any, are cleared for redistribution.
-- Whether preset polarity (lower port number is P) may stay an assumption, or must always be asked.
 
 ## Gotchas carried forward
 

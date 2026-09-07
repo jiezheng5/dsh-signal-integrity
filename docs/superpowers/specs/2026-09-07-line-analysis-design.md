@@ -14,7 +14,7 @@ Status: approved design, 2026-09-07. Owner of the equations: Jie Zheng. Second P
 | Z_c branch selection | Both selectors (positive-real per point, continuity from the low-frequency anchor); points where they disagree are labelled `ambiguous` |
 | Differential outputs | Differential and common mode (IL, RL, Z_c for each); no mode-conversion terms yet |
 | 4-port port mapping | Preset question `through_convention` with `odd_even` listed first, then `half_split`, then `custom` |
-| Preset polarity | Lower port number of a pair is P; the report states this assumption |
+| Preset polarity | Lower port number of a pair is P; the report states this assumption. Proven safe: IL, RL and Z_c are invariant under a P/N swap (a swap negates S21 and S12, hence all four ABCD terms, leaving B/C fixed), so no question is asked. `mixed_mode.polarity_check` warns when the through phase extrapolates to 180 degrees at DC. |
 
 ## Physics (domain owner's equations)
 

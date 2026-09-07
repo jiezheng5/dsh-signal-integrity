@@ -215,3 +215,23 @@ def test_four_port_single_ended_preset_reports_two_paths(tmp_path):
     assert out["status"] == "complete"
     assert set(out["summary"]["modes"]) == {"path1", "path2"}
     assert out["summary"]["modes"]["path1"]["zc_ohm"]["median"] == pytest.approx(50.0, abs=0.5)
+
+
+def test_differential_report_warns_when_the_pair_polarity_looks_swapped(tmp_path):
+    net = fixtures.two_uncoupled_lines(freq=fixtures.frequency(npoints=51))
+    path = fixtures.write(net, tmp_path / "in", "swapped")
+    out = run(
+        base(
+            path,
+            sha256_file(path),
+            tmp_path / "out",
+            device="transmission_line",
+            topology="differential_pairs",
+            # Far end reversed relative to the preset, so the through response inverts.
+            pairs=[{"name": "pair1", "p": 1, "n": 2}, {"name": "pair2", "p": 4, "n": 3}],
+            ports={"in": [1, 2], "out": [3, 4]},
+        )
+    )
+    assert any("polarity" in w for w in out["warnings"])
+    # The reported numbers are unchanged by the swap.
+    assert out["summary"]["modes"]["dd"]["zc_ohm"]["median"] == pytest.approx(100.0, abs=1.0)

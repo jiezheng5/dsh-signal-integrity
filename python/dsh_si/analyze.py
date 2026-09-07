@@ -53,7 +53,13 @@ def _line_modes(
         return {"se": line.analyze_line(network, ports["in"][0], ports["out"][0], tolerances)}
     if "pairs" in interp:
         modes = mixed_mode.to_mixed_mode(network, interp["pairs"])
-        return {name: line.analyze_line(modes[name], 1, 2, tolerances) for name in ("dd", "cc")}
+        out = {name: line.analyze_line(modes[name], 1, 2, tolerances) for name in ("dd", "cc")}
+        # The preset assumes the lower-numbered port is P. That choice cannot change IL, RL
+        # or Z_c, but a swap does invert the through phase, so say so when the data disagrees.
+        suspect = mixed_mode.polarity_check(modes["dd"])
+        if suspect is not None:
+            out["dd"]["warnings"].append(suspect)
+        return out
     out: dict[str, dict[str, Any]] = {}
     for k, (p_in, p_out) in enumerate(zip(ports["in"], ports["out"], strict=True)):
         sub = network.subnetwork([p_in - 1, p_out - 1])

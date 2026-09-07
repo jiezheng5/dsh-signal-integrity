@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 from .protocol import WorkerError
 
 CONVENTIONS: tuple[str, ...] = ("odd_even", "half_split", "custom")
@@ -93,3 +95,40 @@ def split_mixed_mode_file(mixed: Any) -> dict[str, Any]:
     cc = mixed.subnetwork([2, 3])
     dd.name, cc.name = "differential", "common"
     return {"dd": dd, "cc": cc}
+
+
+# Points used to extrapolate the through phase to DC, and the |Sdd21| floor below which
+# there is no through path to judge.
+POLARITY_FIT_POINTS = 11
+POLARITY_MIN_THROUGH = 1e-3
+
+
+def polarity_check(dd: Any) -> str | None:
+    """Warn when the differential through response looks inverted (P and N swapped at one end).
+
+    Every quantity this plugin reports for a line (IL, RL, Z_c) is invariant under a P/N
+    swap, so a wrong polarity guess cannot corrupt them. It does invert the sign of the
+    differential through response, which matters to anyone who later takes phase, group
+    delay, or a time-domain step from the same file. A physical passive through has
+    Sdd21 -> +1 at DC, so unwrapping the measured phase and extrapolating to zero
+    frequency gives about 0 degrees for the assumed polarity and about 180 for a swap.
+
+    Returns the warning text, or None when polarity looks right or cannot be judged.
+    """
+    s21 = np.asarray(dd.s[:, 1, 0], dtype=complex)
+    freq = np.asarray(dd.frequency.f, dtype=float)
+    n = min(POLARITY_FIT_POINTS, s21.size)
+    if n < 3 or np.abs(s21[:n]).min() < POLARITY_MIN_THROUGH:
+        return None
+    phase = np.unwrap(np.angle(s21[:n]))
+    # Straight-line fit of the low-frequency phase; its intercept is the DC phase.
+    intercept = float(np.polyfit(freq[:n], phase, 1)[1])
+    dc_degrees = float(np.degrees(np.angle(np.exp(1j * intercept))))
+    if abs(dc_degrees) <= 90.0:
+        return None
+    return (
+        f"polarity: the differential through response extrapolates to {dc_degrees:.0f} degrees at DC "
+        "rather than 0, which usually means P and N are swapped at one end. IL, RL and Z_c are "
+        "unaffected; the phase sign is not. Set the pairs explicitly with "
+        "through_convention custom if the assumed polarity is wrong."
+    )
