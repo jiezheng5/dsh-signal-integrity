@@ -31,6 +31,8 @@ export interface Config {
     passivity: number
     /** Allowed |Sij - Sji| before a sample is flagged non-reciprocal. */
     reciprocity: number
+    /** |C| of the ABCD matrix below which Z_c = sqrt(B/C) is reported as singular. */
+    singularC: number
   }
   /** Return the key plot of each analysis inline as an image block. */
   inlinePlots: boolean
@@ -55,6 +57,7 @@ export const Config: Schema<Config> = Schema.object({
   tolerances: Schema.object({
     passivity: Schema.number().min(0).default(1e-6),
     reciprocity: Schema.number().min(0).default(1e-6),
-  }).default({ passivity: 1e-6, reciprocity: 1e-6 }),
+    singularC: Schema.number().min(0).default(1e-9),
+  }).default({ passivity: 1e-6, reciprocity: 1e-6, singularC: 1e-9 }),
   inlinePlots: Schema.boolean().default(true),
 })

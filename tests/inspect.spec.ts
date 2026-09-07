@@ -20,7 +20,7 @@ const EXAMPLE_RL = fileURLToPath(new URL('../examples/synthetic/series_rl_10nH.s
 
 describe('si_inspect with the fake worker', () => {
   it('renders metadata, quality, warnings, and the questions block', async () => {
-    const ctx = await mount({ pythonCommand: fakeWorker('inspect'), tolerances: { passivity: 0.001, reciprocity: 1e-6 } })
+    const ctx = await mount({ pythonCommand: fakeWorker('inspect'), tolerances: { passivity: 0.001, reciprocity: 1e-6, singularC: 1e-9 } })
     const result = await callTool(ctx, 'si_inspect', { path: '/data/fake.s2p' })
     expect(result.isError).toBe(false)
     const text = textOf(result)

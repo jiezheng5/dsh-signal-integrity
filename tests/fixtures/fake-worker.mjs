@@ -77,6 +77,30 @@ switch (mode) {
       },
     })
     break
+  case 'line':
+    reply({
+      protocol: 1,
+      ok: true,
+      result: {
+        path: request.payload.path,
+        hash: 'a'.repeat(64),
+        device: 'transmission_line',
+        status: 'complete',
+        report_dir: join(request.payload.output_dir, 'fake'),
+        files: [join(request.payload.output_dir, 'fake', 'line.csv')],
+        plots: writePlot(request.payload),
+        summary: {
+          through_convention: 'odd_even',
+          polarity_note: 'preset polarity: the lower-numbered port of each pair is P',
+          modes: {
+            dd: { z_ref_ohm: 100, zc_ohm: { median: 100.2, min: 99.1, max: 101.3, n_valid: 398 }, il_db_at_fmax: 3.1, fmax_hz: 2e10, regions: { valid: 398, ambiguous: 3 } },
+            cc: { z_ref_ohm: 25, zc_ohm: { median: 25.1, min: 24.8, max: 25.4, n_valid: 401 }, il_db_at_fmax: 3.1, fmax_hz: 2e10, regions: { valid: 401 } },
+          },
+        },
+        warnings: ['dd: 3 ambiguous and 0 singular Z_c points are excluded from the headline numbers'],
+      },
+    })
+    break
   case 'analyze':
     reply({
       protocol: 1,

@@ -49,6 +49,17 @@ describe('si_analyze with the fake worker', () => {
     expect(text).not.toContain('Plot note')
   })
 
+  it('renders one summary line per line mode', async () => {
+    const ctx = await mount({ pythonCommand: fakeWorker('line') })
+    const result = await callTool(ctx, 'si_analyze', { path: '/data/diff.s4p', hash: HASH, interpretation: { device: 'transmission_line', topology: 'differential_pairs', through_convention: 'odd_even' } })
+    expect(result.isError).toBe(false)
+    const text = textOf(result)
+    expect(text).toContain('Analysis of diff.s4p as transmission_line: status complete')
+    expect(text).toContain('  dd: Zc median 100.2 Ω over 398 valid points, IL 3.1 dB at 20 GHz')
+    expect(text).toContain('  cc: Zc median 25.1 Ω over 401 valid points, IL 3.1 dB at 20 GHz')
+    expect(text).toContain('  through_convention: odd_even (preset polarity: the lower-numbered port of each pair is P)')
+  })
+
   it('surfaces hash mismatch as the tool error', async () => {
     const ctx = await mount({ pythonCommand: fakeWorker('hash-mismatch') })
     const result = await callTool(ctx, 'si_analyze', { path: '/data/fake.s2p', hash: HASH, interpretation: { device: 'inductor' } })
