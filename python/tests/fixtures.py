@@ -69,6 +69,16 @@ def two_uncoupled_lines(freq: rf.Frequency | None = None, **kwargs) -> rf.Networ
     return rf.Network(frequency=line.frequency, s=s, z0=50.0, name="two_lines")
 
 
+def series_rlc_oneport(
+    r_ohm: float = 0.5, l_nh: float = 10.0, c_pf: float = 1.0, freq: rf.Frequency | None = None
+) -> rf.Network:
+    """One-port series R + L + C to ground: capacitive below SRF, inductive above."""
+    f = freq or frequency()
+    z = r_ohm + 1j * (f.w * l_nh * 1e-9 - 1 / (f.w * c_pf * 1e-12))
+    s = ((z - 50.0) / (z + 50.0)).reshape(-1, 1, 1)
+    return rf.Network(frequency=f, s=s, z0=50.0, name="series_rlc")
+
+
 def series_rl_oneport(
     r_ohm: float = 1.0, l_nh: float = 10.0, freq: rf.Frequency | None = None
 ) -> rf.Network:
