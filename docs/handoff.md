@@ -11,7 +11,7 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 ## Next step
 
-Merge PR #5. Rebuild + restart, then a real-model demo: inspect → questions → analyze on `examples/synthetic` inductor/capacitor files with the inline L or C plot; capture for README. Then milestone 4: `line.py` (IL, RL, `Z_c = sqrt(B/C)` with the user's `select_zc_branch`; their docstring also gives `Z_c = Z_ref * sqrt(((1+S11)^2 - S12 S21)/((1-S11)^2 - S12 S21))`), `multiport.py`, `se2gmm` pairing.
+Rebuild + restart, then a real-model demo: inspect → questions → analyze on `examples/synthetic` inductor/capacitor files with the inline L or C plot; capture for README. Then milestone 4: `line.py` (IL, RL, `Z_c = sqrt(B/C)` with the user's `select_zc_branch`; their docstring also gives `Z_c = Z_ref * sqrt(((1+S11)^2 - S12 S21)/((1-S11)^2 - S12 S21))`), `multiport.py`, `se2gmm` pairing.
 
 ## Waiting on the domain owner
 
@@ -21,3 +21,8 @@ Merge PR #5. Rebuild + restart, then a real-model demo: inspect → questions �
 ## Gotchas carried forward
 
 See `docs/learning-log.html` page 7. Top three: rebuild + restart before demos; `pkill -f 'bin\.ts web --port 309[9]'`; shell `cd` persists between tool calls.
+
+## Future Planning
+maybe for snp, n > 2 ports, asking user whether it should be modified as single-ended or differential paris, if yes, through topology, industry common practice are either:
+- odd to even, e.g. s8p: 1 - 2, 3 - 4, 5 - 6, 7 - 8, ...
+- i to i + n / 2, e.g.s8p: 1 - 5, 2 - 6, 3 - 7, 4 - 8, ... 
