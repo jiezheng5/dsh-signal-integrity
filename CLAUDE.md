@@ -38,7 +38,7 @@ DSH loads `lib/index.js` by package name through the profile's bundle list (`cor
 - `ctx.subprocess.spawn` has no timeout, no rlimits, no sandbox. Deadlines come from `timeoutMs` + `exec.signal`; memory from the worker's own `setrlimit`.
 - Tool contract: throw only for infrastructure failures; a not-ready environment or a bad file is a *result* (`si_ready`) or a domain error with the worker's message (`si_inspect`).
 - `si_inspect` returns `questions` shaped exactly for `ask_user_question`; tools must not call `ctx.userQuestions.ask` themselves (fails under subagents).
-- Physics placeholders are strict-xfail tests (`python/tests/test_lumped.py`); the domain owner implements `python/dsh_si/lumped.py` and removes the marker. Do not fill those equations in without being asked.
+- `python/dsh_si/lumped.py` carries the domain owner's equations (the module docstring is their spec). Change a formula only when they ask; keep `python/tests/test_lumped.py` closed-form fixtures in step.
 - `examples/realdata/` is gitignored measured data; never `git add -f` it. Examples for the public repo live in `examples/synthetic/`.
 
 ## Testing pattern

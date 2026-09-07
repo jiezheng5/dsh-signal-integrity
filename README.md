@@ -6,7 +6,7 @@ Turns Touchstone S-parameter files into agent-guided signal-integrity reports: t
 
 ## Status
 
-Milestone 3 of 5 (analysis pipeline and reports). `si_ready` probes the Python worker; `si_inspect` parses, hashes, and quality-screens a file, returns an |S| overview plot, and hands the agent the questions it must ask; `si_analyze` validates the answers, refuses a changed file, and writes a report directory (PNG, results.json, HTML). The lumped-element equations (`python/dsh_si/lumped.py`) and interconnect analyses are still pending, so `si_analyze` currently reports `status: overview_only`. See [the plan](docs/plans/dsh-signal-integrity-plan.md) and the [learning log](docs/learning-log.html).
+Milestone 3 of 5 complete (lumped-element extraction). `si_ready` probes the Python worker; `si_inspect` parses, hashes, and quality-screens a file, returns an |S| overview plot, and hands the agent the questions it must ask; `si_analyze` validates the answers, refuses a changed file, and writes a report directory (PNG, CSV, results.json, HTML). Inductors and capacitors are extracted per frequency (L, Q, R or C, ESR) with the self-resonance located and invalid regions labeled; transmission lines and interposers still report `status: overview_only` until milestone 4. See [the plan](docs/plans/dsh-signal-integrity-plan.md) and the [learning log](docs/learning-log.html).
 
 ## How it works
 
@@ -25,7 +25,7 @@ Tools (model-facing):
 |---|---|
 | `si_ready` | Probe uv, the Python interpreter, and the scientific packages; explain any missing piece with the exact remedy. |
 | `si_inspect` | Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and return the interpretation questions (shaped for `ask_user_question`) the agent must ask. |
-| `si_analyze` | Validate the interpretation (device, terminal mode, ports, pairs, paths), refuse a changed file by hash, run the device analysis that exists, and write `<outputDir>/analyze/<file>-<hash8>-<stamp>/` with `s_magnitude.png`, `results.json`, `report.html`. Returns a bounded summary and the key plot inline. |
+| `si_analyze` | Validate the interpretation (device, terminal mode, ports, pairs, paths), refuse a changed file by hash, run the device analysis, and write `<outputDir>/analyze/<file>-<hash8>-<stamp>/` with `s_magnitude.png`, `results.json`, `report.html`, plus `lumped.csv` and one PNG per extracted quantity for inductors and capacitors. Returns a bounded summary and the key plot inline. |
 
 ## Install
 
@@ -86,6 +86,18 @@ The TypeScript tests mount the plugin on a real DSH tool registry and the real l
 ## Reports and plots
 
 Every `si_analyze` call leaves a directory under `outputDir` (default `~/.dsh/si-reports/analyze/`): the |S| overview PNG, `results.json` (input hash, library versions, settings, quality, warnings, summary), and a self-contained `report.html`. `si_inspect` writes the same overview under `inspect/`. When DSH's attachment service is mounted (it is in the web profile) the plot also comes back inline in the chat as an image; otherwise the path is reported. Plots follow one rule set: one axis, fixed eight-color order (reflections first, then the strongest transmissions), units on every axis, assumptions in the subtitle.
+
+## Lumped-element extraction
+
+Terminal interpretation is asked, never guessed, because the same 2-port file can mean three circuits:
+
+| `terminal_mode` | Impedance used | Circuit |
+|---|---|---|
+| `one_port` | Z11 | element from port 1 to ground |
+| `two_terminal_differential` | Z11 + Z22 − Z12 − Z21 | element floating between the ports (series arms of the T-circuit) |
+| `through` | 1 / Y11 | series element in a through fixture (Pi-circuit series arm, ideal fixture) |
+
+From Z(f): L = Im(Z)/ω, Q = Im(Z)/Re(Z), R = Re(Z) for inductors; C = −1/(ω·Im(Z)), ESR = Re(Z) for capacitors. The first sign change of Im(Z) is the self-resonance (linearly interpolated). Every point is labeled `valid`, `near_srf` (within 10 % of the SRF), `beyond_srf`, `wrong_sign`, or `dc`; headline numbers (median, min, max) use valid points only, plots shade the rest, and the CSV carries every point with its label. A wrong-sign point becomes NaN, never a negative component value.
 
 ## Quality checks
 
