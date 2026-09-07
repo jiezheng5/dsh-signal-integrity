@@ -1,0 +1,72 @@
+% Resume entry for dsh-signal-integrity. Three lengths; pick one per resume.
+% Written for a moderncv / plain-article resume: each variant is self-contained,
+% uses only \textbf, \emph, itemize, and \href (hyperref). Replace the URL once
+% the repository is public. Keep the "unofficial" wording: the plugin is not a
+% DeepSeek project and nothing is merged upstream.
+
+% ---------------------------------------------------------------------------
+% VARIANT A: full project entry (portfolio resume, 5 bullets)
+% ---------------------------------------------------------------------------
+\textbf{Signal-Integrity Analysis Plugin for an LLM Agent Harness} \hfill 2026 \\
+\emph{Unofficial community plugin for DeepSeek Harness; TypeScript, Python (scikit-rf, NumPy, Matplotlib)} \\
+\href{https://github.com/jiezheng5/dsh-signal-integrity}{github.com/jiezheng5/dsh-signal-integrity}
+\begin{itemize}
+  \item Built an agent tool suite that turns Touchstone S-parameter files into
+        engineer-reviewable reports: the agent inspects a file, asks the user for
+        the device type and port topology it cannot infer, runs the matching
+        analysis, and returns plots inline in chat plus an HTML/CSV/JSON report.
+  \item Designed the tool contract so the model cannot skip physics it does not
+        know: \texttt{si\_inspect} returns interpretation questions shaped for
+        the harness's ask-user tool, and \texttt{si\_analyze} refuses incomplete
+        interpretations or a file whose SHA-256 changed since inspection.
+  \item Implemented lumped-element extraction (series $L$, $Q$, $R$; series
+        $C$, ESR) for one-port, two-terminal differential
+        ($Z_{11}{+}Z_{22}{-}Z_{12}{-}Z_{21}$) and through-fixture ($1/Y_{11}$)
+        terminations, with self-resonance detection and per-point validity
+        labels so no wrong-sign or beyond-resonance value is reported as a
+        component parameter.
+  \item Adopted IEEE P370 frequency-domain quality metrics (passivity,
+        reciprocity, causality) through scikit-rf alongside exact per-frequency
+        checks that locate violations; verified on synthetic networks with known
+        defects (active, non-reciprocal, anti-causal).
+  \item Isolated numerical work in a JSON-over-stdio Python worker spawned per
+        call with its own memory limit, mirror-tested protocol on both sides,
+        and cooperative cancellation; CI runs typecheck, vitest, ruff, and pytest
+        on every push.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+% VARIANT B: compact entry (two bullets, fits a one-page resume)
+% ---------------------------------------------------------------------------
+\textbf{Signal-Integrity Plugin for an LLM Agent Harness} (TypeScript, Python, scikit-rf) \hfill 2026
+\begin{itemize}
+  \item Agent tools that inspect Touchstone S-parameter files, run IEEE P370
+        quality screening, ask the user for the interpretation the model cannot
+        infer, and extract inductor $L/Q$ and capacitor $C$/ESR with
+        self-resonance and validity labeling; results return as inline plots
+        and an HTML/CSV report.
+  \item Sandboxed Python worker per tool call (JSON over stdio, memory cap,
+        cancellation), shared protocol mirror-tested across languages, full CI
+        on every push. Unofficial community plugin, independently maintained.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+% VARIANT C: one line (skills or projects list)
+% ---------------------------------------------------------------------------
+\textbf{dsh-signal-integrity:} agent-driven S-parameter analysis plugin
+(TypeScript + Python/scikit-rf) with IEEE P370 quality checks, guided device
+interpretation, and lumped $L/Q/C$ extraction with self-resonance labeling.
+
+% ---------------------------------------------------------------------------
+% Talking points for interviews (not for the resume itself)
+% ---------------------------------------------------------------------------
+% - Why questions instead of inference: the same 2-port file is three different
+%   circuits (element to ground, floating element, series-in-fixture); the tool
+%   returns the question and the harness asks it, so subagents work too.
+% - Why hash-gated analyze: the interpretation is bound to the bytes inspected,
+%   so a swapped file cannot inherit an earlier answer.
+% - Why P370 plus exact checks: P370 gives a standard verdict band; the exact
+%   per-frequency checks say where the violation is.
+% - Why the worker limits itself: the harness subprocess seam has no timeout or
+%   rlimit, so the deadline is the tool's cooperative timeout and memory is
+%   RLIMIT_AS set by the worker.
