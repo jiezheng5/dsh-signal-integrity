@@ -110,6 +110,28 @@ def build_questions(metadata: dict[str, Any]) -> list[dict[str, Any]]:
                 ],
             }
         )
+        if n_ports == 4:
+            questions.append(
+                {
+                    "id": "through_convention",
+                    "header": "Through paths",
+                    "question": "Which ports connect through the line? (Preset polarity: the lower port of a pair is P.)",
+                    "options": [
+                        {
+                            "label": "odd_even",
+                            "description": "1\u21922 and 3\u21924 are the through paths; pairs are 1/3 and 2/4 (PLTS-style).",
+                        },
+                        {
+                            "label": "half_split",
+                            "description": "1\u21923 and 2\u21924 are the through paths; pairs are 1/2 and 3/4.",
+                        },
+                        {
+                            "label": "custom",
+                            "description": "Enter ports {in, out} and, for differential, pairs {p, n} yourself.",
+                        },
+                    ],
+                }
+            )
     if metadata.get("mixed_mode_hint") and n_ports != 1:
         questions.append(
             {
