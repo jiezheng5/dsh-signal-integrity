@@ -71,3 +71,26 @@ def test_select_zc_branch_marks_nan_singular():
     assert np.isnan(zc[2]) and regions[2] == "singular"
     assert regions[0] == "valid" and regions[4] == "valid"
     assert zc[3] == pytest.approx(50.0)  # continuity resumes from the last accepted value
+
+
+def test_analyze_line_bundle_on_matched_line(lossy):
+    out = line.analyze_line(lossy, in_port=1, out_port=2, tolerances={})
+    assert set(out["values"]) == {"il_db", "rl_in_db", "rl_out_db", "zc_re_ohm", "zc_im_ohm"}
+    assert out["regions"] == ["valid"] * 101
+    assert out["warnings"] == []
+    assert out["z_ref_ohm"] == pytest.approx(50.0)
+    assert np.allclose(out["values"]["zc_re_ohm"], 50.0, atol=0.5)
+    assert np.allclose(out["values"]["zc_im_ohm"], 0.0, atol=0.5)
+    assert out["freq_hz"][0] == pytest.approx(1e7)
+
+
+def test_analyze_line_warns_on_nonreciprocal_and_asymmetric_data():
+    net = fixtures.nonreciprocal_line(freq=fixtures.frequency(npoints=21))
+    out = line.analyze_line(net, in_port=1, out_port=2, tolerances={"reciprocity": 1e-6})
+    assert any("reciprocity" in w for w in out["warnings"])
+    asym = fixtures.lossy_line(freq=fixtures.frequency(npoints=21))
+    s = asym.s.copy()
+    s[:, 1, 1] = s[:, 1, 1] + 0.05
+    asym.s = s
+    out = line.analyze_line(asym, in_port=1, out_port=2, tolerances={"reciprocity": 1e-6})
+    assert any("symmetry" in w for w in out["warnings"])

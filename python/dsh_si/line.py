@@ -91,3 +91,44 @@ def select_zc_branch(
         previous = b_choice
         regions[k] = "valid" if a_choice is not None and a_choice == b_choice else "ambiguous"
     return zc, regions
+
+
+def analyze_line(
+    network: Any, in_port: int, out_port: int, tolerances: dict[str, Any]
+) -> dict[str, Any]:
+    """IL, RL, and Z_c with region labels for one 2-port (or one mixed-mode 2-port)."""
+    reciprocity_tol = float(tolerances.get("reciprocity", 1e-6))
+    singular_c = float(tolerances.get("singular_c", DEFAULT_SINGULAR_C))
+    freq = np.asarray(network.frequency.f, dtype=float)
+    cand = zc_candidates(network, singular_c)
+    zc, regions = select_zc_branch(cand, freq)
+
+    warnings: list[str] = []
+    s_in_out, s_out_in = _s(network, in_port, out_port), _s(network, out_port, in_port)
+    n_nonrecip = int(np.count_nonzero(np.abs(s_in_out - s_out_in) > reciprocity_tol))
+    if n_nonrecip:
+        warnings.append(
+            f"reciprocity: |S{in_port}{out_port} - S{out_port}{in_port}| exceeds {reciprocity_tol:g} at "
+            f"{n_nonrecip} of {freq.size} points; Z_c still follows the ABCD definition"
+        )
+    s_ii, s_oo = _s(network, in_port, in_port), _s(network, out_port, out_port)
+    n_asym = int(np.count_nonzero(np.abs(s_ii - s_oo) > reciprocity_tol))
+    if n_asym:
+        warnings.append(
+            f"symmetry: |S{in_port}{in_port} - S{out_port}{out_port}| exceeds {reciprocity_tol:g} at "
+            f"{n_asym} of {freq.size} points; the line is not uniform end to end"
+        )
+    z_ref = complex(np.asarray(network.z0)[0, in_port - 1])
+    return {
+        "freq_hz": freq,
+        "values": {
+            "il_db": insertion_loss_db(network, in_port, out_port),
+            "rl_in_db": return_loss_db(network, in_port),
+            "rl_out_db": return_loss_db(network, out_port),
+            "zc_re_ohm": zc.real,
+            "zc_im_ohm": zc.imag,
+        },
+        "regions": regions,
+        "warnings": warnings,
+        "z_ref_ohm": float(z_ref.real),
+    }
