@@ -1,5 +1,4 @@
-"""Analytic checks for lumped extraction. Strict-xfail until dsh_si/lumped.py is implemented:
-remove the marker on each test as its function lands."""
+"""Analytic checks for lumped extraction against closed-form fixtures."""
 
 import numpy as np
 import pytest
@@ -8,12 +7,7 @@ from dsh_si import lumped
 
 from . import fixtures
 
-PENDING = pytest.mark.xfail(
-    strict=True, raises=NotImplementedError, reason="TODO(brittany): lumped.py"
-)
 
-
-@PENDING
 def test_one_port_series_rl_recovers_l_and_q():
     f = fixtures.frequency(0.1, 5.0, 50)
     ntwk = fixtures.series_rl_oneport(r_ohm=1.0, l_nh=10.0, freq=f)
@@ -24,20 +18,23 @@ def test_one_port_series_rl_recovers_l_and_q():
     assert out["Q"] == pytest.approx(f.w * 10e-9 / 1.0, rel=1e-6)
 
 
-@PENDING
-def test_two_terminal_differential_matches_one_port_for_floating_element():
+def test_two_terminal_differential_recovers_series_arm_of_t_circuit():
     f = fixtures.frequency(0.1, 5.0, 20)
     import skrf as rf
 
-    # Series element floating between port 1 and port 2: Z11+Z22-Z12-Z21 must equal Z_element.
-    z_elem = 1.0 + 1j * f.w * 10e-9
-    media = rf.media.DefinedGammaZ0(f, z0=50)
-    two_port = media.resistor(1.0) ** media.inductor(10e-9)
+    # T-circuit: element Z_el in the port-1 arm, shunt leg Z_sh, nothing in the port-2 arm.
+    # Z11 = Z_el + Z_sh, Z22 = Z_sh, Z12 = Z21 = Z_sh, so Z11 + Z22 - Z12 - Z21 = Z_el exactly.
+    z_el = 1.0 + 1j * f.w * 10e-9
+    z_sh = 1 / (1j * f.w * 0.5e-12)
+    zmat = np.empty((f.npoints, 2, 2), dtype=complex)
+    zmat[:, 0, 0] = z_el + z_sh
+    zmat[:, 1, 1] = z_sh
+    zmat[:, 0, 1] = zmat[:, 1, 0] = z_sh
+    two_port = rf.Network(frequency=f, z=zmat, z0=50.0)
     z = lumped.impedance_from_network(two_port, "two_terminal_differential")
-    assert z == pytest.approx(z_elem, rel=1e-6)
+    assert z == pytest.approx(z_el, rel=1e-6)
 
 
-@PENDING
 def test_capacitor_recovers_c():
     f = fixtures.frequency(0.1, 5.0, 20)
     c = 2e-12
@@ -47,7 +44,6 @@ def test_capacitor_recovers_c():
     assert out["ESR_ohm"] == pytest.approx(np.full(20, 0.2), rel=1e-6)
 
 
-@PENDING
 def test_capacitor_reports_nan_when_inductive():
     f = fixtures.frequency(0.1, 5.0, 5)
     z = 0.2 + 1j * f.w * 1e-9  # inductive reactance: no valid series C
@@ -55,7 +51,6 @@ def test_capacitor_reports_nan_when_inductive():
     assert np.all(np.isnan(out["C_f"]))
 
 
-@PENDING
 def test_self_resonance_of_series_rlc():
     f = fixtures.frequency(0.1, 10.0, 991)
     ind, cap = 10e-9, 1e-12  # f_srf = 1/(2*pi*sqrt(LC)) ~ 1.5915 GHz
@@ -65,7 +60,6 @@ def test_self_resonance_of_series_rlc():
     )
 
 
-@PENDING
 def test_classify_region_marks_beyond_srf():
     f = fixtures.frequency(0.1, 10.0, 100)
     ind, cap = 10e-9, 1e-12
@@ -74,3 +68,75 @@ def test_classify_region_marks_beyond_srf():
     assert len(labels) == 100
     assert labels[0] != "valid"  # below SRF the reactance is capacitive for this series RLC
     assert "beyond_srf" in labels or "wrong_sign" in labels
+
+
+def _pi_circuit(f, y_series, y_shunt1, y_shunt2):
+    """2-port from Pi-circuit legs: Y11 = Yp1 + Ys, Y22 = Yp2 + Ys, Y12 = Y21 = -Ys."""
+    import skrf as rf
+
+    ymat = np.empty((f.npoints, 2, 2), dtype=complex)
+    ymat[:, 0, 0] = y_shunt1 + y_series
+    ymat[:, 1, 1] = y_shunt2 + y_series
+    ymat[:, 0, 1] = ymat[:, 1, 0] = -y_series
+    return rf.Network(frequency=f, y=ymat, z0=50.0)
+
+
+def test_through_port2_grounded_is_one_over_y11():
+    f = fixtures.frequency(0.1, 5.0, 20)
+    y_series = 1 / (1.0 + 1j * f.w * 10e-9)
+    y_shunt1 = 1j * f.w * 0.3e-12
+    y_shunt2 = 1j * f.w * 0.7e-12
+    two_port = _pi_circuit(f, y_series, y_shunt1, y_shunt2)
+    z = lumped.impedance_from_network(two_port, "through_port2_grounded")
+    # port 2 shorted: series arm in parallel with the port-1 shunt leg; port-2 leg shorted out
+    assert z == pytest.approx(1 / (y_shunt1 + y_series), rel=1e-6)
+
+
+def test_through_port2_open_is_z11_not_the_shunt_leg():
+    f = fixtures.frequency(0.1, 5.0, 20)
+    y_series = 1 / (1.0 + 1j * f.w * 10e-9)
+    y_shunt1 = 1j * f.w * 0.3e-12
+    y_shunt2 = 1j * f.w * 0.7e-12
+    two_port = _pi_circuit(f, y_series, y_shunt1, y_shunt2)
+    z = lumped.impedance_from_network(two_port, "through_port2_open")
+    # I2 = 0: series arm runs into the port-2 shunt leg, that path in parallel with the port-1 leg
+    y_in = y_shunt1 + y_series * y_shunt2 / (y_series + y_shunt2)
+    assert z == pytest.approx(1 / y_in, rel=1e-6)
+    assert z == pytest.approx(two_port.z[:, 0, 0], rel=1e-6)
+    # 1/(Y11+Y12) is the port-1 shunt leg alone; it must not be what this mode returns
+    assert not np.allclose(z, 1 / y_shunt1, rtol=1e-3)
+
+
+def test_unknown_terminal_mode_raises():
+    f = fixtures.frequency(0.1, 5.0, 3)
+    ntwk = fixtures.series_rl_oneport(freq=f)
+    with pytest.raises(ValueError):
+        lumped.impedance_from_network(ntwk, "through")
+
+
+def test_inductor_reports_nan_at_dc():
+    f = np.array([0.0, 1e9])
+    z = np.array([1.0 + 0j, 1.0 + 1j * 2 * np.pi * 1e9 * 10e-9])
+    out = lumped.inductor_lq(z, f)
+    assert np.isnan(out["L_h"][0]) and np.isnan(out["Q"][0])
+    assert out["L_h"][1] == pytest.approx(10e-9)
+    assert out["R_ohm"][0] == pytest.approx(1.0)
+
+
+def test_self_resonance_none_without_crossing():
+    f = fixtures.frequency(0.1, 5.0, 20)
+    z = 1.0 + 1j * f.w * 10e-9
+    assert lumped.self_resonance_hz(z, f.f) is None
+
+
+def test_classify_region_all_valid_for_ideal_inductor():
+    f = fixtures.frequency(0.1, 5.0, 20)
+    z = 1.0 + 1j * f.w * 10e-9
+    assert lumped.classify_region(z, f.f, "inductor") == ["valid"] * 20
+
+
+def test_classify_region_marks_dc_and_wrong_sign_for_capacitor():
+    f = np.array([0.0, 1e9, 2e9])
+    z = np.array([1e6 + 0j, 1.0 - 1j * 100.0, 1.0 + 1j * 5.0])
+    labels = lumped.classify_region(z, f, "capacitor")
+    assert labels[0] == "dc" and labels[1] == "valid" and labels[2] != "valid"

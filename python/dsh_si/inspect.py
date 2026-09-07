@@ -66,8 +66,12 @@ def build_questions(metadata: dict[str, Any]) -> list[dict[str, Any]]:
                 "question": "How should the two ports be interpreted?",
                 "options": [
                     {
-                        "label": "through",
-                        "description": "Port 1 is the input and port 2 the output (transmission line, series element in a through fixture).",
+                        "label": "through_port2_grounded",
+                        "description": "Element in a through fixture, port 2 grounded in use: Z = 1/Y11 (input impedance with V2 = 0).",
+                    },
+                    {
+                        "label": "through_port2_open",
+                        "description": "Element in a through fixture, port 2 open in use: Z = Z11 (input impedance with I2 = 0).",
                     },
                     {
                         "label": "two_terminal_differential",

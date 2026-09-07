@@ -88,7 +88,7 @@ export function registerAnalyzeTool(ctx: Context, worker: WorkerClient, config: 
           path: { type: 'string', required: true },
           hash: { type: 'string', required: true },
           device: { type: 'string', required: true },
-          status: { type: 'string', required: true, description: 'complete, or overview_only when the device analysis is not implemented yet.' },
+          status: { type: 'string', required: true, description: 'complete for inductors and capacitors; overview_only for lines and interposers until milestone 4.' },
           report_dir: { type: 'string', required: true },
           files: { type: 'array', required: true, items: { type: 'string' } },
           plots: { type: 'array', required: true, items: { type: 'object', additionalProperties: true } },

@@ -83,15 +83,53 @@ def test_line_overview_only_report(line, tmp_path):
     assert (report_dir / "s_magnitude.png").stat().st_size > 5000
 
 
-def test_lumped_pending_is_reported_not_raised(tmp_path):
+def test_inductor_report_has_csv_plots_and_headline(tmp_path):
     path = fixtures.write(
         fixtures.series_rl_oneport(freq=fixtures.frequency(npoints=51)), tmp_path / "in", "rl"
     )
     digest = sha256_file(path)
     result = run(base(path, digest, tmp_path / "out", device="inductor", terminal_mode="one_port"))
-    assert result["status"] == "overview_only"
-    assert any("lumped.py" in w for w in result["warnings"])
-    assert Path(result["report_dir"]).exists()
+    assert result["status"] == "complete"
+    report_dir = Path(result["report_dir"])
+    names = {Path(f).name for f in result["files"]}
+    assert names == {
+        "s_magnitude.png",
+        "inductance.png",
+        "quality_factor.png",
+        "lumped.csv",
+        "results.json",
+        "report.html",
+    }
+    assert [p["name"] for p in result["plots"]] == ["inductance", "quality_factor", "s_magnitude"]
+    csv_lines = (report_dir / "lumped.csv").read_text().splitlines()
+    assert csv_lines[0] == "freq_hz,re_z_ohm,im_z_ohm,L_h,Q,R_ohm,region"
+    assert len(csv_lines) == 52
+    assert csv_lines[1].endswith(",valid")
+    summary = result["summary"]
+    assert summary["L_h"]["median"] == pytest.approx(10e-9, rel=1e-6)
+    assert summary["L_h"]["n_valid"] == 51
+    assert summary["srf_hz"] is None
+    assert summary["regions"] == {"valid": 51}
+    html = (report_dir / "report.html").read_text()
+    assert html.count("data:image/png;base64,") == 3 and "lumped.csv" in html
+
+
+def test_capacitor_report_flags_points_beyond_resonance(tmp_path):
+    path = fixtures.write(
+        fixtures.series_rlc_oneport(freq=fixtures.frequency(0.1, 10.0, 100)), tmp_path / "in", "c"
+    )
+    digest = sha256_file(path)
+    result = run(base(path, digest, tmp_path / "out", device="capacitor", terminal_mode="one_port"))
+    assert result["status"] == "complete"
+    names = {Path(f).name for f in result["files"]}
+    assert {"capacitance.png", "esr.png", "lumped.csv"} <= names
+    summary = result["summary"]
+    assert summary["srf_hz"] == pytest.approx(1.5915e9, rel=5e-3)
+    # series RLC: C_eff = C / (1 - w^2 L C) grows toward the SRF, so only the low end is ~C
+    assert summary["C_f"]["min"] == pytest.approx(1e-12, rel=5e-3)
+    assert 1e-12 < summary["C_f"]["median"] < 3e-12
+    assert summary["regions"]["beyond_srf"] > 0 and summary["regions"]["near_srf"] > 0
+    assert any("beyond" in w or "resonance" in w for w in result["warnings"])
 
 
 def test_inspect_writes_overview_plot_when_output_dir_given(line, tmp_path):

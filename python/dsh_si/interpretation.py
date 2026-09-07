@@ -12,7 +12,12 @@ from typing import Any
 from .protocol import WorkerError
 
 DEVICES = ("inductor", "capacitor", "transmission_line", "interposer")
-LUMPED_MODES = ("one_port", "two_terminal_differential", "through")
+LUMPED_MODES = (
+    "one_port",
+    "two_terminal_differential",
+    "through_port2_grounded",
+    "through_port2_open",
+)
 TOPOLOGIES = ("single_ended_paths", "differential_pairs", "mixed_mode_already")
 
 
@@ -111,7 +116,7 @@ def normalize(raw: Any, n_ports: int) -> dict[str, Any]:
             problems.append(f"terminal_mode: expected one of {list(LUMPED_MODES)}, got {mode!r}")
         elif mode == "one_port" and n_ports < 1:
             problems.append("terminal_mode one_port needs at least one port")
-        elif mode in ("two_terminal_differential", "through") and n_ports != 2:
+        elif mode != "one_port" and n_ports != 2:
             problems.append(f"terminal_mode {mode} needs a 2-port file, this file has {n_ports}")
         out["terminal_mode"] = mode
     elif device == "transmission_line":
