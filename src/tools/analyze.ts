@@ -1,10 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import type { Config } from '../config.ts'
 import { formatHz } from '../format.ts'
 import { imageBlocks, isSavedImage, saveInlineImages } from '../images.ts'
 import type { JsonObject, JsonValue } from '../protocol.ts'
+import type { ReportLinks } from '../reports.ts'
 import { WorkerClient, WorkerError } from '../worker.ts'
 
 const description = 'Run the device-specific signal-integrity analysis on a Touchstone file that si_inspect already inspected. '
@@ -13,7 +14,8 @@ const description = 'Run the device-specific signal-integrity analysis on a Touc
   + 'terminal_mode?: one_port|two_terminal_differential|through (lumped), ports?: {in:[..], out:[..]} (line), '
   + 'topology?: single_ended_paths|differential_pairs|mixed_mode_already (interposer), pairs?: [{name?, p, n}], '
   + 'paths?: [{from, to}], input_is_mixed_mode?: bool }. Writes a report directory (PNG, CSV, results.json, report.html) '
-  + 'and returns a bounded summary plus the key plot.'
+  + 'and returns a bounded summary plus the key plot. When the result carries `report_url`, give it to the user as a '
+  + 'Markdown link so the report opens in the browser; otherwise give the report directory path.'
 
 const DOMAIN_CODES = new Set([
   'bad_request', 'file_not_found', 'parse_error', 'unsupported_format', 'interpretation_invalid', 'hash_mismatch', 'report_write_failed',
@@ -25,6 +27,8 @@ export interface AnalyzeValue {
   device: string
   status: string
   report_dir: string
+  /** http URL of report.html when the plugin is running under the DSH web server. */
+  report_url?: string
   files: string[]
   plots: JsonObject[]
   summary: JsonObject
@@ -44,6 +48,7 @@ function strings(value: JsonValue | undefined): string[] {
 export function renderAnalyze(value: AnalyzeValue): string {
   const lines: string[] = []
   lines.push(`Analysis of ${value.path.split('/').pop() ?? value.path} as ${value.device}: status ${value.status}`)
+  if (value.report_url !== undefined) lines.push(`Report (open in browser): ${value.report_url}`)
   lines.push(`Report directory: ${value.report_dir}`)
   for (const file of value.files) lines.push(`  ${file.split('/').pop() ?? file}`)
   const entries = Object.entries(value.summary)
@@ -66,7 +71,7 @@ export function renderAnalyze(value: AnalyzeValue): string {
   return lines.join('\n')
 }
 
-export function registerAnalyzeTool(ctx: Context, worker: WorkerClient, config: Config): void {
+export function registerAnalyzeTool(ctx: Context, worker: WorkerClient, config: Config, links: ReportLinks): void {
   ctx.tools.register(defineTool({
     name: 'si_analyze',
     description,
@@ -90,6 +95,7 @@ export function registerAnalyzeTool(ctx: Context, worker: WorkerClient, config: 
           device: { type: 'string', required: true },
           status: { type: 'string', required: true, description: 'complete for inductors and capacitors; overview_only for lines and interposers until milestone 4.' },
           report_dir: { type: 'string', required: true },
+          report_url: { type: 'string', description: 'http link to report.html; present only under the DSH web server.' },
           files: { type: 'array', required: true, items: { type: 'string' } },
           plots: { type: 'array', required: true, items: { type: 'object', additionalProperties: true } },
           summary: { type: 'object', required: true, additionalProperties: true },
@@ -126,12 +132,15 @@ export function registerAnalyzeTool(ctx: Context, worker: WorkerClient, config: 
       }
       const plots = Array.isArray(result['plots']) ? result['plots'].map(obj) : []
       const saved = await saveInlineImages(ctx, plots, config.inlinePlots)
+      const reportDir = String(result['report_dir'] ?? '')
+      const reportUrl = reportDir === '' ? undefined : links.reportUrl(join(reportDir, 'report.html'))
       return {
         path: String(result['path'] ?? args.path),
         hash: String(result['hash'] ?? args.hash),
         device: String(result['device'] ?? ''),
         status: String(result['status'] ?? 'unknown'),
-        report_dir: String(result['report_dir'] ?? ''),
+        report_dir: reportDir,
+        ...reportUrl === undefined ? {} : { report_url: reportUrl },
         files: strings(result['files']),
         plots,
         summary: obj(result['summary']),

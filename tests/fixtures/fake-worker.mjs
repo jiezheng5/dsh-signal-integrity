@@ -13,6 +13,8 @@ function writePlot(payload) {
   mkdirSync(dir, { recursive: true })
   const path = join(dir, 's_magnitude.png')
   writeFileSync(path, PNG)
+  writeFileSync(join(dir, 'report.html'), '<html><body>fake report</body></html>')
+  writeFileSync(join(dir, 'results.json'), '{}')
   return [{ name: 's_magnitude', path, title: '|S| overview of fake.s2p' }]
 }
 
