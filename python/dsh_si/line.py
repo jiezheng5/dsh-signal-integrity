@@ -54,3 +54,40 @@ def zc_candidates(network: Any, singular_c: float = DEFAULT_SINGULAR_C) -> np.nd
     with np.errstate(invalid="ignore", divide="ignore"):
         root = np.sqrt(b / safe_c)
     return np.stack([root, -root], axis=1)
+
+
+def select_zc_branch(
+    candidates: np.ndarray, freq_hz: np.ndarray
+) -> tuple[np.ndarray, list[Region]]:
+    """Pick one Z_c root per frequency and label the point.
+
+    Selector A: the root with Re > 0 (undecided when both or neither qualify).
+    Selector B: Re > 0 at the first finite point, then the root nearest the previously
+    accepted value (frequency continuity).
+    The reported value follows B. Regions: `valid` when A and B agree, `ambiguous` when
+    they differ or A is undecided, `singular` when neither root is finite (value NaN).
+    """
+    cand = np.asarray(candidates, dtype=complex)
+    n = cand.shape[0]
+    zc = np.full(n, np.nan, dtype=complex)
+    regions: list[Region] = ["singular"] * n
+    previous: complex | None = None
+    for k in range(n):
+        pair = cand[k]
+        finite = np.isfinite(pair)
+        if not finite.any():
+            continue
+        positive = finite & (pair.real > 0)
+        a_choice = complex(pair[positive][0]) if positive.sum() == 1 else None
+        if previous is None:
+            if a_choice is None:
+                # No anchor yet and A undecided: take the finite root with the larger Re.
+                b_choice = complex(pair[finite][np.argmax(pair[finite].real)])
+            else:
+                b_choice = a_choice
+        else:
+            b_choice = complex(pair[finite][np.argmin(np.abs(pair[finite] - previous))])
+        zc[k] = b_choice
+        previous = b_choice
+        regions[k] = "valid" if a_choice is not None and a_choice == b_choice else "ambiguous"
+    return zc, regions

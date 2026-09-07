@@ -93,3 +93,15 @@ def write(ntwk: rf.Network, directory: Path, stem: str, form: str = "ri") -> Pat
     directory.mkdir(parents=True, exist_ok=True)
     ntwk.write_touchstone(str(directory / stem), form=form)
     return directory / f"{stem}.s{ntwk.nports}p"
+
+
+def zc_candidates_with_flip(n: int = 20, flip_at: int = 12) -> np.ndarray:
+    """Roots of a 50 Ohm line with one point where both roots have Re > 0.
+
+    Selector A (positive real) cannot decide there; selector B (continuity) still follows
+    the curve, so the point must come back labelled `ambiguous`.
+    """
+    root = np.full(n, 50.0 + 0.5j, dtype=complex)
+    cand = np.stack([root, -root], axis=1)
+    cand[flip_at] = [1.0 + 50.0j, 1.0 - 50.0j]
+    return cand

@@ -45,3 +45,29 @@ def test_zc_candidates_nan_where_c_is_singular():
     cand = line.zc_candidates(singular, singular_c=1e-9)
     assert np.all(np.isnan(cand[2]))
     assert np.all(np.isfinite(cand[[0, 1, 3, 4]]))
+
+
+def test_select_zc_branch_follows_positive_real_root_on_clean_line(lossy):
+    cand = line.zc_candidates(lossy)
+    zc, regions = line.select_zc_branch(cand, lossy.frequency.f)
+    assert np.allclose(zc.real, 50.0, atol=0.5)
+    assert regions == ["valid"] * 101
+
+
+def test_select_zc_branch_marks_disagreement_ambiguous():
+    cand = fixtures.zc_candidates_with_flip(n=20, flip_at=12)
+    zc, regions = line.select_zc_branch(cand, np.linspace(1e8, 2e9, 20))
+    assert regions[12] == "ambiguous"
+    assert regions[:12] == ["valid"] * 12 and regions[13:] == ["valid"] * 7
+    # continuity picks the root nearest the previous value 50+0.5j:
+    # |1+50j - (50+0.5j)| ~ 69.6 < |1-50j - (50+0.5j)| ~ 70.4, so 1+50j
+    assert zc[12] == pytest.approx(1.0 + 50.0j)
+
+
+def test_select_zc_branch_marks_nan_singular():
+    cand = np.stack([np.full(5, 50.0 + 0j), np.full(5, -50.0 + 0j)], axis=1)
+    cand[2] = np.nan
+    zc, regions = line.select_zc_branch(cand, np.linspace(1e8, 1e9, 5))
+    assert np.isnan(zc[2]) and regions[2] == "singular"
+    assert regions[0] == "valid" and regions[4] == "valid"
+    assert zc[3] == pytest.approx(50.0)  # continuity resumes from the last accepted value
