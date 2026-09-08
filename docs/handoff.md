@@ -1,6 +1,6 @@
 # Handoff
 
-Short, committed state for the next session (human or agent). Keep it under a screen; history lives in git and `docs/learning-log.html`.
+Short, committed state for the next session (human or agent). Keep it under a screen; history lives in git and `docs/learning-log.html`. Step-by-step actions for picking the work back up are in `docs/next-session.md`.
 
 ## State (2026-09-07)
 
