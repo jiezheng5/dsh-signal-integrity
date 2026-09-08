@@ -55,7 +55,7 @@ def test_invalid_interpretation_writes_nothing(line, tmp_path):
     assert not (tmp_path / "out").exists()
 
 
-def test_line_overview_only_report(line, tmp_path):
+def test_line_report_is_complete(line, tmp_path):
     path, digest = line
     result = run(
         base(
@@ -66,20 +66,28 @@ def test_line_overview_only_report(line, tmp_path):
             ports={"in": [1], "out": [2]},
         )
     )
-    assert result["status"] == "overview_only"
-    assert any("milestone 4" in w for w in result["warnings"])
+    assert result["status"] == "complete"
+    assert not any("milestone 4" in w for w in result["warnings"])
     report_dir = Path(result["report_dir"])
     assert report_dir.parent == tmp_path / "out" / "analyze"
     assert report_dir.name.startswith(f"line-{digest[:8]}-")
     names = {Path(f).name for f in result["files"]}
-    assert names == {"s_magnitude.png", "results.json", "report.html"}
+    assert names == {
+        "s_magnitude.png",
+        "line.csv",
+        "insertion_loss.png",
+        "return_loss.png",
+        "characteristic_impedance.png",
+        "results.json",
+        "report.html",
+    }
     results = json.loads((report_dir / "results.json").read_text())
     assert results["input"]["sha256"] == digest
     assert set(results["versions"]) >= {"dsh_si", "scikit-rf", "numpy", "matplotlib"}
     assert results["quality"]["passivity"]["p370"]["evaluation"] == "good"
     html = (report_dir / "report.html").read_text()
     assert "data:image/png;base64," in html and "results.json" in html
-    assert result["plots"][0]["name"] == "s_magnitude"
+    assert result["plots"][0]["name"] == "characteristic_impedance"
     assert (report_dir / "s_magnitude.png").stat().st_size > 5000
 
 
@@ -154,3 +162,76 @@ def test_report_dir_rejects_unwritable_location(line):
             )
         )
     assert info.value.code == "report_write_failed"
+
+
+def test_two_port_line_summary_and_csv(line, tmp_path):
+    path, digest = line
+    out = run(base(path, digest, tmp_path / "out", device="transmission_line"))
+    se = out["summary"]["modes"]["se"]
+    assert se["zc_ohm"]["median"] == pytest.approx(50.0, abs=0.5)
+    assert se["zc_ohm"]["n_valid"] == 101
+    assert se["il_db_at_fmax"] == pytest.approx(5.0 * 0.020 * (20.0**0.5), abs=0.05)
+    header = (Path(out["report_dir"]) / "line.csv").read_text().splitlines()[0]
+    assert header == "mode,freq_hz,il_db,rl_in_db,rl_out_db,zc_re_ohm,zc_im_ohm,region"
+
+
+def test_four_port_differential_line_reports_dd_and_cc(tmp_path):
+    net = fixtures.two_uncoupled_lines_odd_even(freq=fixtures.frequency(npoints=51))
+    path = fixtures.write(net, tmp_path / "in", "diff")
+    out = run(
+        base(
+            path,
+            sha256_file(path),
+            tmp_path / "out",
+            device="transmission_line",
+            topology="differential_pairs",
+            through_convention="odd_even",
+        )
+    )
+    assert out["status"] == "complete"
+    modes = out["summary"]["modes"]
+    assert modes["dd"]["zc_ohm"]["median"] == pytest.approx(100.0, abs=1.0)
+    assert modes["cc"]["zc_ohm"]["median"] == pytest.approx(25.0, abs=0.25)
+    assert out["summary"]["through_convention"] == "odd_even"
+    assert "lower" in out["summary"]["polarity_note"]
+    names = {Path(f).name for f in out["files"]}
+    assert {"dd_characteristic_impedance.png", "cc_insertion_loss.png", "line.csv"} <= names
+    rows = (Path(out["report_dir"]) / "line.csv").read_text().splitlines()
+    assert rows[1].startswith("dd,") and rows[52].startswith("cc,")
+
+
+def test_four_port_single_ended_preset_reports_two_paths(tmp_path):
+    net = fixtures.two_uncoupled_lines(freq=fixtures.frequency(npoints=21))
+    path = fixtures.write(net, tmp_path / "in", "se4")
+    out = run(
+        base(
+            path,
+            sha256_file(path),
+            tmp_path / "out",
+            device="transmission_line",
+            through_convention="half_split",
+        )
+    )
+    assert out["status"] == "complete"
+    assert set(out["summary"]["modes"]) == {"path1", "path2"}
+    assert out["summary"]["modes"]["path1"]["zc_ohm"]["median"] == pytest.approx(50.0, abs=0.5)
+
+
+def test_differential_report_warns_when_the_pair_polarity_looks_swapped(tmp_path):
+    net = fixtures.two_uncoupled_lines(freq=fixtures.frequency(npoints=51))
+    path = fixtures.write(net, tmp_path / "in", "swapped")
+    out = run(
+        base(
+            path,
+            sha256_file(path),
+            tmp_path / "out",
+            device="transmission_line",
+            topology="differential_pairs",
+            # Far end reversed relative to the preset, so the through response inverts.
+            pairs=[{"name": "pair1", "p": 1, "n": 2}, {"name": "pair2", "p": 4, "n": 3}],
+            ports={"in": [1, 2], "out": [3, 4]},
+        )
+    )
+    assert any("polarity" in w for w in out["warnings"])
+    # The reported numbers are unchanged by the swap.
+    assert out["summary"]["modes"]["dd"]["zc_ohm"]["median"] == pytest.approx(100.0, abs=1.0)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import mixed_mode
 from .protocol import WorkerError
 
 DEVICES = ("inductor", "capacitor", "transmission_line", "interposer")
@@ -120,22 +121,58 @@ def normalize(raw: Any, n_ports: int) -> dict[str, Any]:
             problems.append(f"terminal_mode {mode} needs a 2-port file, this file has {n_ports}")
         out["terminal_mode"] = mode
     elif device == "transmission_line":
-        ports = raw.get("ports")
-        if not isinstance(ports, dict):
-            problems.append("ports: expected {in: [...], out: [...]}")
+        topology = raw.get("topology", "single_ended_paths")
+        if topology not in TOPOLOGIES:
+            problems.append(f"topology: expected one of {list(TOPOLOGIES)}, got {topology!r}")
+            topology = "single_ended_paths"
+        out["topology"] = topology
+        convention = raw.get("through_convention")
+        if n_ports not in (2, 4):
+            problems.append(
+                f"transmission_line analysis needs a 2- or 4-port file, this file has {n_ports}"
+            )
+        if convention is not None and convention not in mixed_mode.CONVENTIONS:
+            problems.append(
+                f"through_convention: expected one of {list(mixed_mode.CONVENTIONS)}, "
+                f"got {convention!r}"
+            )
+            convention = None
+        if n_ports == 2:
+            out["ports"] = {"in": [1], "out": [2]}
+        elif topology == "mixed_mode_already" or mixed:
+            # Stored as [d_in, d_out, c_in, c_out]; the analysis splits it without converting.
+            out["ports"] = {"in": [1], "out": [2]}
+            out["input_is_mixed_mode"] = True
+        elif convention in ("odd_even", "half_split") and n_ports == 4:
+            preset = mixed_mode.preset_mapping(convention, n_ports)
+            out["through_convention"] = convention
+            out["ports"] = preset["ports"]
+            if topology == "differential_pairs":
+                out["pairs"] = preset["pairs"]
         else:
-            out["ports"] = {
-                "in": _port_list(ports.get("in"), "ports.in", n_ports, problems),
-                "out": _port_list(ports.get("out"), "ports.out", n_ports, problems),
-            }
-            if out["ports"]["in"] and out["ports"]["out"]:
-                if len(out["ports"]["in"]) != len(out["ports"]["out"]):
-                    problems.append("ports: in and out must have the same length")
-                overlap = set(out["ports"]["in"]) & set(out["ports"]["out"])
-                if overlap:
-                    problems.append(f"ports: {sorted(overlap)} listed as both in and out")
-        if "pairs" in raw and raw["pairs"] is not None:
-            out["pairs"] = _pairs(raw["pairs"], n_ports, problems)
+            if convention == "custom":
+                out["through_convention"] = "custom"
+            ports = raw.get("ports")
+            if not isinstance(ports, dict):
+                problems.append(
+                    "ports: expected {in: [...], out: [...]} "
+                    "(or choose through_convention odd_even / half_split)"
+                )
+            else:
+                out["ports"] = {
+                    "in": _port_list(ports.get("in"), "ports.in", n_ports, problems),
+                    "out": _port_list(ports.get("out"), "ports.out", n_ports, problems),
+                }
+                if out["ports"]["in"] and out["ports"]["out"]:
+                    if len(out["ports"]["in"]) != len(out["ports"]["out"]):
+                        problems.append("ports: in and out must have the same length")
+                    overlap = set(out["ports"]["in"]) & set(out["ports"]["out"])
+                    if overlap:
+                        problems.append(f"ports: {sorted(overlap)} listed as both in and out")
+            if topology == "differential_pairs":
+                out["pairs"] = _pairs(raw.get("pairs"), n_ports, problems)
+            elif "pairs" in raw and raw["pairs"] is not None:
+                out["pairs"] = _pairs(raw["pairs"], n_ports, problems)
     else:  # interposer
         topology = raw.get("topology")
         if topology not in TOPOLOGIES:

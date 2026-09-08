@@ -28,7 +28,11 @@ DEVICE_OPTIONS = [
 REQUIRED_BY_DEVICE: dict[str, list[str]] = {
     "inductor": ["terminal_mode"],
     "capacitor": ["terminal_mode"],
-    "transmission_line": ["ports", "pairs (if differential)", "input_is_mixed_mode"],
+    "transmission_line": [
+        "through_convention (4-port) or ports",
+        "topology (4-port)",
+        "input_is_mixed_mode",
+    ],
     "interposer": ["paths", "pairs (if differential)", "input_is_mixed_mode"],
 }
 
@@ -106,6 +110,28 @@ def build_questions(metadata: dict[str, Any]) -> list[dict[str, Any]]:
                 ],
             }
         )
+        if n_ports == 4:
+            questions.append(
+                {
+                    "id": "through_convention",
+                    "header": "Through paths",
+                    "question": "Which ports connect through the line? (Preset polarity: the lower port of a pair is P.)",
+                    "options": [
+                        {
+                            "label": "odd_even",
+                            "description": "1\u21922 and 3\u21924 are the through paths; pairs are 1/3 and 2/4 (PLTS-style).",
+                        },
+                        {
+                            "label": "half_split",
+                            "description": "1\u21923 and 2\u21924 are the through paths; pairs are 1/2 and 3/4.",
+                        },
+                        {
+                            "label": "custom",
+                            "description": "Enter ports {in, out} and, for differential, pairs {p, n} yourself.",
+                        },
+                    ],
+                }
+            )
     if metadata.get("mixed_mode_hint") and n_ports != 1:
         questions.append(
             {

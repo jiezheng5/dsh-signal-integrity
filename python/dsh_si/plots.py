@@ -89,6 +89,8 @@ REGION_SHADE = {
     "beyond_srf": "#e34948",
     "wrong_sign": "#e34948",
     "dc": "#52514e",
+    "ambiguous": "#e0a020",
+    "singular": "#e34948",
 }
 
 
@@ -167,3 +169,61 @@ def save_png(fig: Any, path: Path, dpi: int = 130) -> Path:
     fig.savefig(path, dpi=dpi, facecolor="white")
     plt.close(fig)
     return path
+
+
+def _shade_regions(ax: Any, f_ghz: np.ndarray, regions: list[str]) -> set[str]:
+    """Shade every maximal run of shaded region labels; returns the labels used."""
+    shaded: set[str] = set()
+    start = None
+    for k, label in enumerate(list(regions) + [None]):
+        if start is not None and label != regions[start]:
+            ax.axvspan(
+                f_ghz[start],
+                f_ghz[k - 1],
+                color=REGION_SHADE[regions[start]],
+                alpha=0.12,
+                linewidth=0,
+            )
+            shaded.add(regions[start])
+            start = None
+        if label in REGION_SHADE and start is None:
+            start = k
+    return shaded
+
+
+def line_quantity(
+    freq_hz: np.ndarray,
+    series: list[tuple[str, np.ndarray]],
+    regions: list[str],
+    ylabel: str,
+    title: str,
+    subtitle: str,
+) -> Any:
+    """One or two line quantities versus frequency with ambiguous/singular spans shaded."""
+    f_ghz = np.asarray(freq_hz, dtype=float) / 1e9
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=100)
+    for k, (label, values) in enumerate(series):
+        ax.plot(
+            f_ghz, np.asarray(values, dtype=float), color=PALETTE[k], linewidth=1.6, label=label
+        )
+    shaded = _shade_regions(ax, f_ghz, regions)
+    ax.set_xlabel("Frequency (GHz)")
+    ax.set_ylabel(ylabel)
+    ax.set_title(f"{title}\n{subtitle}", fontsize=11, loc="left")
+    ax.grid(True, alpha=0.25, linewidth=0.6)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    if len(series) > 1 or shaded:
+        ax.legend(frameon=False, fontsize=9)
+    if shaded:
+        ax.text(
+            1.0,
+            -0.14,
+            "shaded: " + ", ".join(sorted(shaded)),
+            transform=ax.transAxes,
+            ha="right",
+            fontsize=8,
+            color="#52514e",
+        )
+    fig.tight_layout()
+    return fig

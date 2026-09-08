@@ -1,11 +1,11 @@
 """`analyze` command: validate the interpretation, refuse changed inputs, run the
 device analysis that exists, and always leave a report directory behind.
 
-Lumped elements (inductor, capacitor) are complete: per-frequency CSV, one plot
-per extracted quantity with invalid regions shaded, and a headline summary over
-the valid region only. Lines and interposers are milestone 4; for them the
-command still produces the overview plot, results.json and report.html, and
-says so in `status`.
+Lumped elements (inductor, capacitor) and transmission lines are complete:
+per-frequency CSV, one plot per extracted quantity with invalid regions shaded,
+and a headline summary over the valid region only. Interposers are the next PR;
+for them the command still produces the overview plot, results.json and
+report.html, and says so in `status`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from . import interpretation, lumped, plots, quality, report
+from . import interpretation, line, lumped, mixed_mode, plots, quality, report
 from .protocol import WorkerError
 from .touchstone import load, resolve_path, sha256_file
 
@@ -26,6 +26,175 @@ LUMPED_PLOTS = {
     "C_f": ("Capacitance (pF)", 1e12, "capacitance"),
     "ESR_ohm": ("ESR (Ω)", 1.0, "esr"),
 }
+
+
+# (axis label, [(series label, value key)], file stem) per line plot; Z_c draws Re and Im.
+LINE_PLOTS = [
+    (
+        "Characteristic impedance (Ω)",
+        [("Re Zc", "zc_re_ohm"), ("Im Zc", "zc_im_ohm")],
+        "characteristic_impedance",
+    ),
+    ("Insertion loss (dB)", [("IL", "il_db")], "insertion_loss"),
+    ("Return loss (dB)", [("RL in", "rl_in_db"), ("RL out", "rl_out_db")], "return_loss"),
+]
+POLARITY_NOTE = "preset polarity: the lower-numbered port of each pair is P"
+
+
+def _line_modes(
+    network: Any, interp: dict[str, Any], tolerances: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
+    """Name -> analyze_line result: se (2-port), pathN (single-ended 4-port), dd/cc (differential)."""
+    ports = interp["ports"]
+    if interp.get("input_is_mixed_mode"):
+        modes = mixed_mode.split_mixed_mode_file(network)
+        return {name: line.analyze_line(net, 1, 2, tolerances) for name, net in modes.items()}
+    if network.nports == 2:
+        return {"se": line.analyze_line(network, ports["in"][0], ports["out"][0], tolerances)}
+    if "pairs" in interp:
+        modes = mixed_mode.to_mixed_mode(network, interp["pairs"])
+        out = {name: line.analyze_line(modes[name], 1, 2, tolerances) for name in ("dd", "cc")}
+        # The preset assumes the lower-numbered port is P. That choice cannot change IL, RL
+        # or Z_c, but a swap does invert the through phase, so say so when the data disagrees.
+        suspect = mixed_mode.polarity_check(modes["dd"])
+        if suspect is not None:
+            out["dd"]["warnings"].append(suspect)
+        return out
+    out: dict[str, dict[str, Any]] = {}
+    for k, (p_in, p_out) in enumerate(zip(ports["in"], ports["out"], strict=True)):
+        sub = network.subnetwork([p_in - 1, p_out - 1])
+        out[f"path{k + 1}"] = line.analyze_line(sub, 1, 2, tolerances)
+    return out
+
+
+def _summarize_line(result: dict[str, Any]) -> dict[str, Any]:
+    """Headline numbers over the valid region only, so an ambiguous branch never sets the median."""
+    valid = np.array([r == "valid" for r in result["regions"]])
+    zc = np.asarray(result["values"]["zc_re_ohm"], dtype=float)
+    finite = zc[valid & np.isfinite(zc)]
+    counts: dict[str, int] = {}
+    for label in result["regions"]:
+        counts[label] = counts.get(label, 0) + 1
+    il = np.asarray(result["values"]["il_db"], dtype=float)
+    return {
+        "z_ref_ohm": result["z_ref_ohm"],
+        "zc_ohm": {
+            "median": float(np.median(finite)) if finite.size else None,
+            "min": float(finite.min()) if finite.size else None,
+            "max": float(finite.max()) if finite.size else None,
+            "n_valid": int(finite.size),
+        },
+        "il_db_at_fmax": float(il[-1]),
+        "fmax_hz": float(result["freq_hz"][-1]),
+        "regions": counts,
+    }
+
+
+def _write_line(
+    modes: dict[str, dict[str, Any]],
+    interp: dict[str, Any],
+    report_dir: Path,
+    name: str,
+    subtitle: str,
+    files: list[str],
+    plot_entries: list[dict[str, str]],
+    warnings: list[str],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """line.csv, three PNGs per mode, warnings; returns (summary, report sections)."""
+    header = [
+        "mode",
+        "freq_hz",
+        "il_db",
+        "rl_in_db",
+        "rl_out_db",
+        "zc_re_ohm",
+        "zc_im_ohm",
+        "region",
+    ]
+
+    def rows():
+        for mode, res in modes.items():
+            values, freq = res["values"], res["freq_hz"]
+            for k in range(len(freq)):
+                yield [
+                    mode,
+                    float(freq[k]),
+                    *(float(values[key][k]) for key in header[2:7]),
+                    res["regions"][k],
+                ]
+
+    files.append(str(report.write_csv(report_dir / "line.csv", header, rows())))
+    sections: list[dict[str, Any]] = []
+    is_preset = interp.get("through_convention") in ("odd_even", "half_split")
+    summary: dict[str, Any] = {
+        "through_convention": interp.get("through_convention"),
+        "polarity_note": POLARITY_NOTE if is_preset and "pairs" in interp else None,
+        "modes": {},
+    }
+    single = len(modes) == 1
+    for mode, res in modes.items():
+        prefix = "" if single else f"{mode}_"
+        for ylabel, series, stem in LINE_PLOTS:
+            fig = plots.line_quantity(
+                res["freq_hz"],
+                [(label, res["values"][key]) for label, key in series],
+                res["regions"],
+                ylabel,
+                f"{ylabel.split(' (')[0]} of {name}" + ("" if single else f" ({mode})"),
+                subtitle,
+            )
+            png = plots.save_png(fig, report_dir / f"{prefix}{stem}.png")
+            files.append(str(png))
+            plot_entries.append(
+                {
+                    "name": f"{prefix}{stem}",
+                    "path": str(png),
+                    "title": f"{ylabel} vs frequency ({mode})",
+                }
+            )
+        for warning in res["warnings"]:
+            warnings.append(f"{mode}: {warning}")
+        stats = _summarize_line(res)
+        summary["modes"][mode] = stats
+        if stats["regions"].get("ambiguous") or stats["regions"].get("singular"):
+            warnings.append(
+                f"{mode}: {stats['regions'].get('ambiguous', 0)} ambiguous and "
+                f"{stats['regions'].get('singular', 0)} singular Z_c points are excluded "
+                "from the headline numbers"
+            )
+        zc = stats["zc_ohm"]
+        sections.append(
+            {
+                "heading": f"Line analysis ({mode}, Z_ref {stats['z_ref_ohm']:g} Ω)",
+                "table": {
+                    "header": ["Quantity", "Value"],
+                    "rows": [
+                        [
+                            "Z_c median (valid region)",
+                            f"{zc['median']:.4g} Ω" if zc["median"] is not None else "n/a",
+                        ],
+                        [
+                            "Z_c min / max",
+                            f"{zc['min']:.4g} / {zc['max']:.4g} Ω"
+                            if zc["median"] is not None
+                            else "n/a",
+                        ],
+                        [
+                            "IL at f_max",
+                            f"{stats['il_db_at_fmax']:.3g} dB at {stats['fmax_hz'] / 1e9:.3g} GHz",
+                        ],
+                        ["Regions", ", ".join(f"{k} {v}" for k, v in stats["regions"].items())],
+                    ],
+                },
+                "text": (summary["polarity_note"] or "") if mode == "dd" else "",
+            }
+        )
+        for entry in plot_entries:
+            if entry["name"] == "s_magnitude":
+                continue
+            if single or entry["name"].startswith(f"{mode}_"):
+                sections.append({"heading": entry["title"], "image": entry["path"]})
+    return summary, sections
 
 
 def _lumped(network: Any, interp: dict[str, Any]) -> dict[str, Any]:
@@ -175,9 +344,17 @@ def run(payload: dict[str, Any]) -> dict[str, Any]:
             },
             *[{"heading": entry["title"], "image": entry["path"]} for entry in device_plots],
         ]
+    elif interp["device"] == "transmission_line":
+        modes = _line_modes(network, interp, tolerances)
+        line_plots: list[dict[str, str]] = []
+        summary, lumped_sections = _write_line(
+            modes, interp, report_dir, path.name, subtitle, files, line_plots, warnings
+        )
+        plot_entries[:0] = line_plots  # the key plot (first) is the characteristic impedance
+        status = "complete"
     else:
         warnings.append(
-            f"{interp['device']} analysis arrives in milestone 4; only the overview is reported"
+            f"{interp['device']} analysis arrives in the interposer PR; only the overview is reported"
         )
 
     results = {

@@ -33,6 +33,10 @@ export interface AnalyzeValue {
   image_notes: string[]
 }
 
+function trim4(value: number): string {
+  return Number.parseFloat(value.toPrecision(4)).toString()
+}
+
 function obj(value: JsonValue | undefined): JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}
 }
@@ -50,6 +54,28 @@ export function renderAnalyze(value: AnalyzeValue): string {
   if (entries.length > 0) {
     lines.push('Summary:')
     for (const [key, raw] of entries) {
+      if (key === 'modes' && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+        for (const [mode, stats] of Object.entries(raw)) {
+          if (typeof stats !== 'object' || stats === null || Array.isArray(stats)) continue
+          const zc = stats['zc_ohm']
+          const bag = typeof zc === 'object' && zc !== null && !Array.isArray(zc) ? zc : {}
+          const median = bag['median']
+          const il = stats['il_db_at_fmax']
+          const fmax = stats['fmax_hz']
+          const zcText = typeof median === 'number'
+            ? `Zc median ${trim4(median)} \u03a9 over ${String(bag['n_valid'] ?? 0)} valid points`
+            : 'Zc undefined over the valid region'
+          const ilText = typeof il === 'number' && typeof fmax === 'number' ? `, IL ${trim4(il)} dB at ${formatHz(fmax)}` : ''
+          lines.push(`  ${mode}: ${zcText}${ilText}`)
+        }
+        continue
+      }
+      if (key === 'through_convention' && typeof raw === 'string') {
+        const note = value.summary['polarity_note']
+        lines.push(`  through_convention: ${raw}${typeof note === 'string' ? ` (${note})` : ''}`)
+        continue
+      }
+      if (key === 'polarity_note') continue
       if (typeof raw === 'object' && raw !== null && !Array.isArray(raw) && 'median' in raw) {
         const median = raw['median']
         lines.push(`  ${key}: median ${median === null ? 'undefined' : String(median)} over ${String(raw['n_valid'])} valid points`)
@@ -113,7 +139,11 @@ export function registerAnalyzeTool(ctx: Context, worker: WorkerClient, config: 
           hash: args.hash,
           interpretation: args.interpretation as JsonObject,
           output_dir: config.outputDir,
-          tolerances: config.tolerances,
+          tolerances: {
+            passivity: config.tolerances.passivity,
+            reciprocity: config.tolerances.reciprocity,
+            singular_c: config.tolerances.singularC,
+          },
         }, exec.signal)
       } catch (error) {
         if (error instanceof WorkerError && DOMAIN_CODES.has(error.code)) {
