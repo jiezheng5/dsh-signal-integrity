@@ -19,8 +19,7 @@ export function fakeWorker(mode: string): string[] {
  * Mount the plugin on a bare Context with the real tool registry and the real
  * local subprocess provider: keyless, no model, no uv unless the config asks.
  */
-export async function mountPlugin(config: Partial<Config> = {}): Promise<Context> {
-  const ctx = new Context()
+export async function mountPlugin(config: Partial<Config> = {}, ctx = new Context()): Promise<Context> {
   await ctx.plugin(SystemPrompt, {})
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(LocalSubprocessRuntime)
