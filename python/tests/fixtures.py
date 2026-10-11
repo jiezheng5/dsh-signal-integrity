@@ -93,3 +93,23 @@ def write(ntwk: rf.Network, directory: Path, stem: str, form: str = "ri") -> Pat
     directory.mkdir(parents=True, exist_ok=True)
     ntwk.write_touchstone(str(directory / stem), form=form)
     return directory / f"{stem}.s{ntwk.nports}p"
+
+
+def zc_candidates_with_flip(n: int = 20, flip_at: int = 12) -> np.ndarray:
+    """Roots of a 50 Ohm line with one point where both roots have Re > 0.
+
+    Selector A (positive real) cannot decide there; selector B (continuity) still follows
+    the curve, so the point must come back labelled `ambiguous`.
+    """
+    root = np.full(n, 50.0 + 0.5j, dtype=complex)
+    cand = np.stack([root, -root], axis=1)
+    cand[flip_at] = [1.0 + 50.0j, 1.0 - 50.0j]
+    return cand
+
+
+def two_uncoupled_lines_odd_even(freq: rf.Frequency | None = None, **kwargs) -> rf.Network:
+    """The same two lines numbered PLTS-style: through 1->2 and 3->4, pairs (1,3) and (2,4)."""
+    net = two_uncoupled_lines(freq=freq, **kwargs).copy()
+    net.renumber([0, 1, 2, 3], [0, 2, 1, 3])
+    net.name = "two_lines_odd_even"
+    return net

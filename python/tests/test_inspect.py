@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from dsh_si import quality
-from dsh_si.inspect import run
+from dsh_si.inspect import build_questions, run
 from dsh_si.protocol import WorkerError
 from dsh_si.touchstone import sha256_file
 
@@ -93,7 +93,7 @@ def test_multiport_asks_topology(tmp_path: Path):
     assert result["metadata"]["n_ports"] == 4
     assert result["quality"]["passivity"]["passive"] is True
     ids = [q["id"] for q in result["questions"]]
-    assert ids == ["device", "topology"]
+    assert ids == ["device", "topology", "through_convention"]
     labels = {o["label"] for o in result["questions"][1]["options"]}
     assert labels == {"single_ended_paths", "differential_pairs", "mixed_mode_already"}
 
@@ -183,3 +183,18 @@ def test_two_port_offers_both_through_modes(tmp_path: Path):
     from dsh_si.interpretation import LUMPED_MODES
 
     assert set(labels) <= set(LUMPED_MODES)
+
+
+def test_four_port_asks_through_convention_after_topology():
+    questions = build_questions({"n_ports": 4, "mixed_mode_hint": False})
+    ids = [q["id"] for q in questions]
+    assert ids[:3] == ["device", "topology", "through_convention"]
+    labels = [o["label"] for o in questions[2]["options"]]
+    assert labels == ["odd_even", "half_split", "custom"]
+    assert "1\u21922 and 3\u21924" in questions[2]["options"][0]["description"]
+
+
+def test_two_and_eight_port_do_not_ask_through_convention():
+    for n in (2, 8):
+        ids = [q["id"] for q in build_questions({"n_ports": n, "mixed_mode_hint": False})]
+        assert "through_convention" not in ids

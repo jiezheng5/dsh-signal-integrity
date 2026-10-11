@@ -85,3 +85,56 @@ def test_lumped_through_modes_need_two_ports_and_old_name_is_rejected():
     with pytest.raises(WorkerError) as info:
         normalize({"device": "inductor", "terminal_mode": "through"}, 2)
     assert "through_port2_grounded" in info.value.message
+
+
+def test_line_two_port_defaults_ports_and_convention_is_ignored():
+    out = normalize({"device": "transmission_line"}, 2)
+    assert out["ports"] == {"in": [1], "out": [2]}
+    assert out["topology"] == "single_ended_paths"
+    assert "pairs" not in out
+
+
+def test_line_four_port_preset_fills_ports_and_pairs():
+    out = normalize(
+        {
+            "device": "transmission_line",
+            "through_convention": "odd_even",
+            "topology": "differential_pairs",
+        },
+        4,
+    )
+    assert out["through_convention"] == "odd_even"
+    assert out["ports"] == {"in": [1, 3], "out": [2, 4]}
+    assert out["pairs"] == [{"name": "pair1", "p": 1, "n": 3}, {"name": "pair2", "p": 2, "n": 4}]
+
+
+def test_line_four_port_single_ended_preset_has_no_pairs():
+    out = normalize({"device": "transmission_line", "through_convention": "half_split"}, 4)
+    assert out["ports"] == {"in": [1, 2], "out": [3, 4]}
+    assert out["topology"] == "single_ended_paths" and "pairs" not in out
+
+
+def test_line_custom_requires_ports():
+    assert "ports" in bad({"device": "transmission_line", "through_convention": "custom"}, 4)
+
+
+def test_line_rejects_three_ports_and_unknown_convention():
+    assert "2- or 4-port" in bad(
+        {"device": "transmission_line", "ports": {"in": [1], "out": [2]}}, 3
+    )
+    assert "through_convention" in bad(
+        {"device": "transmission_line", "through_convention": "zigzag"}, 4
+    )
+
+
+def test_line_mixed_mode_input_keeps_stored_order():
+    out = normalize(
+        {
+            "device": "transmission_line",
+            "topology": "mixed_mode_already",
+            "input_is_mixed_mode": True,
+        },
+        4,
+    )
+    assert out["ports"] == {"in": [1], "out": [2]}
+    assert out["input_is_mixed_mode"] is True

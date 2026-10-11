@@ -6,7 +6,7 @@ Turns Touchstone S-parameter files into agent-guided signal-integrity reports: t
 
 ## Status
 
-Milestone 3 of 5 complete (lumped-element extraction). `si_ready` probes the Python worker; `si_inspect` parses, hashes, and quality-screens a file, returns an |S| overview plot, and hands the agent the questions it must ask; `si_analyze` validates the answers, refuses a changed file, and writes a report directory (PNG, CSV, results.json, HTML). Inductors and capacitors are extracted per frequency (L, Q, R or C, ESR) with the self-resonance located and invalid regions labeled; transmission lines and interposers still report `status: overview_only` until milestone 4. See [the plan](docs/plans/dsh-signal-integrity-plan.md) and the [learning log](docs/learning-log.html).
+Milestone 4 of 5 in progress (transmission-line analysis). `si_ready` probes the Python worker; `si_inspect` parses, hashes, and quality-screens a file, returns an |S| overview plot, and hands the agent the questions it must ask; `si_analyze` validates the answers, refuses a changed file, and writes a report directory (PNG, CSV, results.json, HTML). Inductors and capacitors are extracted per frequency (L, Q, R or C, ESR) with the self-resonance located and invalid regions labeled. Transmission lines report insertion loss, return loss, and complex characteristic impedance from the ABCD matrix, for a 2-port line and for a 4-port differential line (differential and common mode after mixed-mode conversion), with ambiguous and singular Z_c branches labeled; interposers still report `status: overview_only`. See [the plan](docs/plans/dsh-signal-integrity-plan.md) and the [learning log](docs/learning-log.html).
 
 ## How it works
 
@@ -25,7 +25,7 @@ Tools (model-facing):
 |---|---|
 | `si_ready` | Probe uv, the Python interpreter, and the scientific packages; explain any missing piece with the exact remedy. |
 | `si_inspect` | Parse a Touchstone file, hash it, run passivity, reciprocity, and causality screening, and return the interpretation questions (shaped for `ask_user_question`) the agent must ask. |
-| `si_analyze` | Validate the interpretation (device, terminal mode, ports, pairs, paths), refuse a changed file by hash, run the device analysis, and write `<outputDir>/analyze/<file>-<hash8>-<stamp>/` with `s_magnitude.png`, `results.json`, `report.html`, plus `lumped.csv` and one PNG per extracted quantity for inductors and capacitors. Returns a bounded summary and the key plot inline. |
+| `si_analyze` | Validate the interpretation (device, terminal mode, ports, pairs, paths), refuse a changed file by hash, run the device analysis, and write `<outputDir>/analyze/<file>-<hash8>-<stamp>/` with `s_magnitude.png`, `results.json`, `report.html`, plus `lumped.csv` and one PNG per extracted quantity for inductors and capacitors, or `line.csv` and IL, RL, and Z_c PNGs for transmission lines. Returns a bounded summary and the key plot inline. |
 
 ## Install
 

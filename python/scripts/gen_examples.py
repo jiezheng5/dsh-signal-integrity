@@ -20,6 +20,9 @@ def main() -> None:
         fixtures.write(fixtures.lossy_line(), OUT, "lossy_line_20mm"),
         fixtures.write(fixtures.series_rl_oneport(), OUT, "series_rl_10nH"),
         fixtures.write(fixtures.two_uncoupled_lines(), OUT, "two_uncoupled_lines"),
+        fixtures.write(
+            fixtures.two_uncoupled_lines_odd_even(), OUT, "two_uncoupled_lines_odd_even"
+        ),
         fixtures.write(fixtures.advanced_line(), OUT, "anticausal_line"),
         fixtures.write(fixtures.active_line(), OUT, "active_line_gain1p5"),
         fixtures.write(fixtures.nonreciprocal_line(), OUT, "nonreciprocal_line"),

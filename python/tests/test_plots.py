@@ -21,3 +21,25 @@ def test_two_port_draws_all_four_terms():
 
 def test_db_has_floor():
     assert plots.db(np.array([0.0]))[0] == plots.DB_FLOOR
+
+
+def test_line_quantity_draws_two_series_and_shades_ambiguous(tmp_path):
+    f = np.linspace(1e8, 1e10, 20)
+    re = np.full(20, 50.0)
+    im = np.zeros(20)
+    regions = ["valid"] * 20
+    regions[7] = "ambiguous"
+    regions[15] = "singular"
+    fig = plots.line_quantity(
+        f,
+        [("Re Zc", re), ("Im Zc", im)],
+        regions,
+        "Characteristic impedance (Ω)",
+        "Zc of x",
+        "sub",
+    )
+    ax = fig.axes[0]
+    assert len(ax.get_lines()) == 2
+    assert len(ax.patches) == 2  # one axvspan per shaded point
+    png = plots.save_png(fig, tmp_path / "zc.png")
+    assert png.stat().st_size > 1000

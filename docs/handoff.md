@@ -1,6 +1,6 @@
 # Handoff
 
-Short, committed state for the next session (human or agent). Keep it under a screen; history lives in git and `docs/learning-log.html`.
+Short, committed state for the next session (human or agent). Keep it under a screen; history lives in git and `docs/learning-log.html`. Step-by-step actions for picking the work back up are in `docs/next-session.md`.
 
 ## State (2026-09-07)
 
@@ -14,10 +14,11 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 1. Real-model demo in the browser (Claude-in-Chrome was not connected): inspect → questions → analyze `examples/synthetic/series_rl_10nH.s1p`; confirm the final answer carries the `http://127.0.0.1:3080/si-reports/...` link and the tool card shows the inline plot; capture for README.
 2. Milestone 4 brainstorm, remaining questions: Z_c branch selection contract (`select_zc_branch` is the domain owner's), which port-mapping question `si_inspect` asks for 4-port (odd/even vs i, i+n/2 pairing), and whether IL/RL for differential use `Sdd21`/`Sdd11` only.
 
-## Waiting on the domain owner
+## Open questions
 
 - Interpretation of `examples/realdata/QSFPDD IL_NR1.S4P` (non-reciprocal at every point: partial export?).
 - Which `examples/realdata` files, if any, are cleared for redistribution.
+- Return loss reads 315 to 350 dB on the ideal synthetic fixture, which is floating-point noise in `|S11|` rather than a real number. Consider clamping the reported value above about 120 dB. Measured data never reaches this.
 
 ## Gotchas carried forward
 
