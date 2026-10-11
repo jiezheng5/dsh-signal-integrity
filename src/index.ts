@@ -16,6 +16,7 @@ import { Config } from './config.ts'
 import { registerAnalyzeTool } from './tools/analyze.ts'
 import { registerInspectTool } from './tools/inspect.ts'
 import { registerReadyTool } from './tools/ready.ts'
+import { registerReportRoute } from './reports.ts'
 import { WorkerClient } from './worker.ts'
 
 export const name = 'signal-integrity'
@@ -26,7 +27,8 @@ export { PROTOCOL_VERSION, COMMANDS, WORKER_ERROR_CODES } from './protocol.ts'
 
 export function apply(ctx: Context, config: Config): void {
   const worker = new WorkerClient(ctx, config)
+  const links = registerReportRoute(ctx, config.outputDir)
   registerReadyTool(ctx, worker, config)
   registerInspectTool(ctx, worker, config)
-  registerAnalyzeTool(ctx, worker, config)
+  registerAnalyzeTool(ctx, worker, config, links)
 }

@@ -4,21 +4,15 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 ## State (2026-09-07)
 
-- `main`: milestones 1 to 3 merged (scaffold, inspection, lumped equations with the through-mode split).
-- PR #6 `feat/report-link` (open, off `main`): `si_analyze` returns `report_url`, the plugin serves `outputDir` at `/si-reports` on the DSH web server, plus `scripts/dev-restart.sh` and `docs/deployment.md`.
-- PR #7 `feat/line-analysis` (open, off `main`, not stacked on #6): milestone 4 part 1. `line.py` (IL, RL, `Z_c = sqrt(B/C)` with `select_zc_branch`), `mixed_mode.py` (odd_even / half_split presets, `se2gmm` into dd and cc, `polarity_check`), `through_convention` question and validation, `line.csv`, IL/RL/Z_c plots, `status: complete` for lines.
-- Both PRs were merged locally on the throwaway branch `demo/integration` to run the demo: no code conflicts, only `docs/handoff.md`. Delete that branch once one of them lands.
-- Dev profile `~/.dsh/profiles/web` links this checkout; `patchReload: startup` (inotify limits). Cold boot takes 3 to 4 minutes; the socket answers 404 while the tree composes.
-
-## Verified by real-model demo (2026-09-07, DeepSeek-V4-Flash)
-
-`si_inspect` → three questions through `ask_user_question` → `si_analyze` on `examples/synthetic/two_uncoupled_lines_odd_even.s4p` as a differential line. Z_c 100 Ω differential and 25 Ω common, insertion loss 0.447 dB at 20 GHz, all 401 points `valid`, ten files written, and the model handed back the `report_url` as a clickable link that opens the report. The `through_convention` card renders with `odd_even` first and the polarity note in the question line.
+- `main`: milestones 1 to 3 merged (PR #5 landed the lumped equations, through-mode split, CSV, per-quantity PNGs).
+- Branch `feat/report-link` (PR #6): `si_analyze` returns `report_url` and the plugin serves `outputDir` under `/si-reports` on the DSH web server (`ctx.inject(['connection','webServer'])`, cookie auth via `requestRejection`, realpath containment, extension allowlist). Also `scripts/dev-restart.sh` and a rewritten `docs/deployment.md`.
+- Dev profile `~/.dsh/profiles/web` links this checkout; `patchReload: startup` because of inotify exhaustion on this host. Credentials in `~/.dsh/.env`. Cold boot 3 to 4 minutes; the socket answers 404 while composing.
+- Milestone 4 scope agreed: first PR is `line.py` only (2-port single-ended and 4-port differential IL, RL, Z_c); interposer multiport is a second PR.
 
 ## Next step
 
-1. Domain-owner review of `select_zc_branch` in `python/dsh_si/line.py`: selector A is positive-real, selector B is continuity, disagreement is labelled `ambiguous` and excluded from the median while keeping B's value in the CSV and plot.
-2. Milestone 4 part 2 (interposer): `paths`, per-port return loss, all directed transmission terms grouped by source port, and the mode-conversion plots (`Sdc21`, `Scd21`) deferred from PR #7.
-3. Capture a README asset from the demo session. The one attempt was cropped because Chrome was at a non-default zoom; reset zoom first.
+1. Real-model demo in the browser (Claude-in-Chrome was not connected): inspect → questions → analyze `examples/synthetic/series_rl_10nH.s1p`; confirm the final answer carries the `http://127.0.0.1:3080/si-reports/...` link and the tool card shows the inline plot; capture for README.
+2. Milestone 4 brainstorm, remaining questions: Z_c branch selection contract (`select_zc_branch` is the domain owner's), which port-mapping question `si_inspect` asks for 4-port (odd/even vs i, i+n/2 pairing), and whether IL/RL for differential use `Sdd21`/`Sdd11` only.
 
 ## Open questions
 
@@ -28,13 +22,8 @@ Short, committed state for the next session (human or agent). Keep it under a sc
 
 ## Gotchas carried forward
 
-See `docs/learning-log.html` page 7 and `docs/deployment.md`.
-
-- `lib/` currently holds the `demo/integration` build, not either branch. Run `scripts/dev-restart.sh` before trusting any UI behaviour: the model only ever sees the built bundle.
-- The DSH session cookie is `SameSite=Strict`, so a report link opened by browser automation (Claude in Chrome, Playwright) gets 401 while the same link clicked inside the chat works. Not a product defect; it does block extension-driven checks of `/si-reports`.
-- Never print `~/.dsh/dsh-web.log`; it holds the token URL.
-- `skrf.network.a2s` is not exported at the `skrf` top level.
+See `docs/learning-log.html` page 7 and `docs/deployment.md`. Top three: rebuild + restart before demos (`scripts/dev-restart.sh`); never print `~/.dsh/dsh-web.log` (token URL); shell `cd` persists between tool calls.
 
 ## Future planning
 
-For n > 4 ports, the same two through conventions generalize: odd to even (1-2, 3-4, ...) or i to i + n/2 (1-5, 2-6, ... for s8p). The preset question currently appears for 4-port files only.
+For n > 2 ports, ask whether to treat ports as single-ended or differential pairs; common through topologies: odd to even (1-2, 3-4, ...) or i to i + n/2 (1-5, 2-6, ... for s8p).
